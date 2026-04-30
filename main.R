@@ -2,6 +2,8 @@
 # STA203 - Project
 ##################
 library(ggplot2)
+library(FactoMineR)
+library(factoextra)
 
 rm(list=objects())
 graphics.off(); seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
@@ -22,7 +24,6 @@ gp = ggplot(seeds) +
   ylab("Proportion of tracks") +
   labs(fill="Music genre")
 ggsave("output/part1/genre_proportions.png", gp)
-gp
 prop.table(table(seeds$GENRE))
 
 ncol(seeds)
@@ -143,3 +144,25 @@ common_normality_plot = ggplot(common_normality) +
   xlab("Common candidate variable") +
   ylab("Shapiro-Wilk statistic on log(x)")
 ggsave("output/part1/common_candidates_log_normality.png", common_normality_plot)
+
+# PCA
+#Apply log and center and scale data
+seeds[, c("PAR_SC_V", "PAR_ASC_V")] = log(seeds[, c("PAR_SC_V", "PAR_ASC_V")])
+seeds[, sapply(seeds, is.numeric)] = scale(seeds[, sapply(seeds, is.numeric)], center=TRUE, scale=TRUE)
+
+n = nrow(seeds)
+p = ncol(seeds)
+
+res = PCA(seeds[,-p], graph=FALSE)
+
+round(res$eig,4) # variance of each axe
+sum(res$eig[,1])
+
+#Inertie percetage of each component
+inertie_percentage = ggplot() + aes(x=1:length(res$eig[,2]), y=res$eig[,2]) + geom_col() + 
+  geom_hline(yintercept=100/p, lty=2) +
+  ggtitle("Percentage of Inertia Explained by Each Principal Component") +
+  xlab("Principal component") +
+  ylab("Explained inertia (%)")
+ggsave("output/part1/inertie_percentage.png", inertie_percentage)
+
