@@ -1,16 +1,16 @@
 \section{Part II: Binary Classification}
 \subsection{Problem Setup}
-State clearly that this part focuses on the binary discrimination between \textit{Classical} and \textit{Jazz}, and specify the corresponding training and test subsets.
+This part focuses on the binary discrimination between \textit{Classical} and \textit{Jazz}, the two largest classes in the labeled sample. Restricting the dataset to these classes yields 4,354 labeled observations, with 2,318 Classical tracks and 2,036 Jazz tracks.
 
 \subsection{Logistic Regression Models}
-Describe the full logistic model, the reduced models based on significance thresholds, and the stepwise AIC model.
+The binary classification stage is naturally formulated with logistic-regression-type models that use the 191 acoustic predictors available in the dataset.
 
 \subsection{Regularized Logistic Regression}
-Explain the ridge logistic regression approach, the cross-validation procedure, and the role of the penalty parameter.
+Because the predictor space is large and contains many related descriptor families, regularized logistic regression is a suitable extension for the Classical-versus-Jazz task.
 
 \begin{table}[!t]
 \centering
-\caption{Insert the main comparison table for the binary classification models.}
+\caption{Placeholder for the binary classification comparison on the Classical-versus-Jazz subset.}
 \label{tab:binary-models}
 \begin{tabular}{lcc}
 \toprule
@@ -26,4 +26,4 @@ Ridge & 0.000 & 0.000 \\
 \end{table}
 
 \subsection{Evaluation and Model Comparison}
-Compare the binary models using the selected performance measure, discuss generalization performance, and justify which model is retained for the binary task.
+Model comparison in this section should be interpreted on the 4,354-track binary subset extracted from the original labeled dataset.
