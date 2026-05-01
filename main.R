@@ -6,6 +6,7 @@ library(FactoMineR)
 library(factoextra)
 library(cluster)
 library(MASS)
+library(ROCR)
 
 rm(list=objects())
 graphics.off(); seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
@@ -395,3 +396,111 @@ capture.output(summary(Mod1), file="output/part2/models/Mod1_summary.txt")
 capture.output(summary(Mod2), file="output/part2/models/Mod2_summary.txt")
 capture.output(summary(ModAIC), file="output/part2/models/ModAIC_summary.txt")
 capture.output(ModAIC$anova, file="output/part2/models/ModAIC_anova.txt")
+
+####
+#Question 2
+####
+#Directory for ROC graphs storage
+dir.create("output/part2/roc", recursive=TRUE, showWarnings=FALSE)
+
+#Load Pretrained models
+
+ModT = readRDS("output/part2/models/ModT.rds")
+Mod1 = readRDS("output/part2/models/Mod1.rds")
+Mod2 = readRDS("output/part2/models/Mod2.rds")
+ModAIC = readRDS("output/part2/models/ModAIC.rds")
+
+#Following training order 
+
+Y_train = as.numeric(binary_train$Y == "Jazz")
+Y_test = as.numeric(binary_test$Y == "Jazz")
+
+#Models predictions for test and train data
+predT_train = prediction(predict(ModT, newdata=train_ModT, type="response"), Y_train)
+predT_test = prediction(predict(ModT, newdata=test_ModT, type="response"), Y_test)
+pred1_test = prediction(predict(Mod1, newdata=test_Mod1, type="response"), Y_test)
+pred2_test = prediction(predict(Mod2, newdata=test_Mod2, type="response"), Y_test)
+predAIC_test = prediction(predict(ModAIC, newdata=test_ModT, type="response"), Y_test)
+pred_perfect = prediction(Y_test, Y_test)
+
+
+#Prepare ROC curves with sensitivity and false positive rate
+ROC.T.train = performance(predT_train, "sens", "fpr")
+ROC.T.test = performance(predT_test, "sens", "fpr")
+ROC.1.test = performance(pred1_test, "sens", "fpr")
+ROC.2.test = performance(pred2_test, "sens", "fpr")
+ROC.AIC.test = performance(predAIC_test, "sens", "fpr")
+ROC.perfect = performance(pred_perfect, "sens", "fpr")
+
+#Compute the area under the ROC curve for each model
+AUC.T.train = round(performance(predT_train, "auc")@y.values[[1]], 4)
+AUC.T.test = round(performance(predT_test, "auc")@y.values[[1]], 4)
+AUC.1.test = round(performance(pred1_test, "auc")@y.values[[1]], 4)
+AUC.2.test = round(performance(pred2_test, "auc")@y.values[[1]], 4)
+AUC.AIC.test = round(performance(predAIC_test, "auc")@y.values[[1]], 4)
+
+#Build a dataframe to superpose all ROC curves in a single ggplot
+df = data.frame(
+  FPR = c(unlist(ROC.T.train@x.values),
+          unlist(ROC.T.test@x.values),
+          unlist(ROC.1.test@x.values),
+          unlist(ROC.2.test@x.values),
+          unlist(ROC.AIC.test@x.values),
+          c(0, 0, 1),
+          unlist(ROC.T.test@x.values)),
+  TPR = c(unlist(ROC.T.train@y.values),
+          unlist(ROC.T.test@y.values),
+          unlist(ROC.1.test@y.values),
+          unlist(ROC.2.test@y.values),
+          unlist(ROC.AIC.test@y.values),
+          c(0, 1, 1),
+          unlist(ROC.T.test@x.values)),
+  type = factor(rep(1:7, c(length(unlist(ROC.T.train@y.values)),
+                           length(unlist(ROC.T.test@y.values)),
+                           length(unlist(ROC.1.test@y.values)),
+                           length(unlist(ROC.2.test@y.values)),
+                           length(unlist(ROC.AIC.test@y.values)),
+                           3,
+                           length(unlist(ROC.T.test@x.values)))))
+)
+
+#Plot the ROC curves with AUC values in the legend
+ROC_plot = ggplot(df, aes(FPR, TPR, color=type, linetype=type)) +
+  geom_line() +
+  labs(title="ROC curves",
+       x="False Positive Rate (1-Specificity)",
+       y="True Positive Rate (Sensitivity)") +
+  scale_color_manual(
+    name="",
+    values=1:7,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  ) +
+  scale_linetype_manual(
+    name="",
+    values=1:7,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  )
+
+ggsave("output/part2/roc/roc_curves.png", ROC_plot, width=12, height=8)
+
+#Save the model summaries for adequacy checks
+capture.output(summary(ModT), file="output/part2/roc/ModT_summary_for_adequacy.txt")
+capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.txt")
+capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
+capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
