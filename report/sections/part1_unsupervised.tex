@@ -27,3 +27,17 @@ Principal component analysis is used here as a dimensionality-reduction tool to 
 
 \subsection{Hierarchical Clustering and Silhouettes}
 Hierarchical clustering and silhouette diagnostics can be applied to the same standardized acoustic descriptors to compare data-driven groupings with the five observed genre labels.
+
+\begin{equation}
+\mathrm{sil}(x_i) = \frac{b_i - a_i}{\max(a_i, b_i)}
+\end{equation}
+
+\begin{equation}
+a_i = \frac{1}{|C_k|-1}\sum_{x_\ell \in C_k, \ell \neq i} d(x_i, x_\ell),
+\qquad
+b_i = \min_{k' \neq k}\frac{1}{|C_{k'}|}\sum_{x_\ell \in C_{k'}} d(x_i, x_\ell)
+\end{equation}
+
+\begin{equation}
+\widehat{K} = \arg\max_{K \in \{2,\ldots,10\}} \frac{1}{n}\sum_{i=1}^{n}\mathrm{sil}(x_i)
+\end{equation}
