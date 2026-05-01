@@ -306,3 +306,9 @@ for (mode in c("not_normalized", "normalized")) {
   }
 }
 
+####
+#Question 4
+####
+
+set.seed(103)
+train = sample(c(TRUE, FALSE), n, replace=TRUE, prob=c(2/3, 1/3))
