@@ -12,7 +12,9 @@ dir.create("output/part1", recursive=TRUE, showWarnings=FALSE)
 # PART I
 #################
 
+####
 #Question 1
+####
 summary(seeds)        
 
 #Genre Proportion Graphic Representation          
@@ -160,10 +162,13 @@ seeds = seeds[, !names(seeds) %in% c("PAR_ASE_M", "PAR_ASE_MV", "PAR_SFM_M", "PA
 
 p = ncol(seeds)
 
-res = PCA(seeds[,-p], graph=FALSE)
 
+####
+#Question 2
+####
 
-#Proper values studies
+res = PCA(seeds[,-p],ncp=40, graph=FALSE)
+#Proper values study
 
 round(res$eig,4) # variance of each axe
 sum(res$eig[,1])
@@ -177,7 +182,45 @@ inertie_percentage = ggplot() + aes(x=1:length(res$eig[,2]), y=res$eig[,2]) + ge
 ggsave("output/part1/inertie_percentage.png", inertie_percentage)
 
 
-#Correlation of variables studies
+#Correlation of variables study
 V = res$var
-plot(res,choix="var") 
+#Quality of representation
+V$cos2
+
+#First principal plane
+#LLM suggestion for use of fviz_pca_ind to adequatly represent the genre in the  PCA graphs
+plt1 = factoextra::fviz_pca_ind(res, axes = c(1,2), habillage = seeds[,p], label = "none")
+plt2 = plot(res, axes = c(1,2), choix = "var")
+pca_first_plane = cowplot::plot_grid(plt1, plt2, ncol = 2, nrow = 1)
+ggsave("output/part1/pca_first_plane.png", pca_first_plane, width = 14, height = 6)
+
+#Second principal plane
+plt3 = factoextra::fviz_pca_ind(res, axes = c(3,4), habillage = seeds[,p], label = "none")
+plt4 = plot(res, axes = c(3,4), choix = "var")
+pca_second_plane = cowplot::plot_grid(plt3, plt4, ncol = 2, nrow = 1)
+ggsave("output/part1/pca_second_plane.png", pca_second_plane, width = 14, height = 6)
+
+#Inertias and quality for both planes
+planes_inertia = sum(res$eig[1:4,2])
+planes_cos2 = mean(rowSums(res$ind$cos2[,1:4]))
+
+c( planes_inertia = planes_inertia, planes_cos2 = planes_cos2)
+
+#which(res$eig[,2] > 100 / p)
+
+#Candidates to select a  4 6 10 34
+
+#Inertias and quality for Candidate variables
+for (k in c(4, 6, 10, 34)) {
+  cat(
+    "k =", k,
+    " | inertia =", sum(res$eig[1:k,2]),
+    " | mean cos2 =", mean(rowSums(res$ind$cos2[, 1:k, drop=FALSE])),
+    "\n"
+  )
+}
+
+####
+#Question 3
+####
 
