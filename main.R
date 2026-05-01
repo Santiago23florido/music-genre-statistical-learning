@@ -7,6 +7,7 @@ library(factoextra)
 library(cluster)
 library(MASS)
 library(ROCR)
+library(glmnet)
 
 rm(list=objects())
 graphics.off(); seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
@@ -359,43 +360,6 @@ test_Mod1 = binary_test[, c("Y", vars_Mod1), drop=FALSE]
 train_Mod2 = binary_train[, c("Y", vars_Mod2), drop=FALSE]
 test_Mod2 = binary_test[, c("Y", vars_Mod2), drop=FALSE]
 
-# Reduced logistic models
-Mod1 = glm(Y ~ ., family=binomial, data=train_Mod1)
-Mod2 = glm(Y ~ ., family=binomial, data=train_Mod2)
-
-summary(Mod1)
-summary(Mod2)
-
-# Stepwise AIC logistic model
-ModAIC = stepAIC(ModT)
-
-summary(ModAIC)
-
-ModAIC$anova
-
-# Save fitted models
-saveRDS(ModT, "output/part2/models/ModT.rds")
-saveRDS(Mod1, "output/part2/models/Mod1.rds")
-saveRDS(Mod2, "output/part2/models/Mod2.rds")
-saveRDS(ModAIC, "output/part2/models/ModAIC.rds")
-
-# Save retained variable names
-writeLines(
-  c(
-    paste("ModT :", paste(names(train_ModT)[names(train_ModT) != "Y"], collapse=" + ")),
-    paste("Mod1 :", paste(vars_Mod1, collapse=" + ")),
-    paste("Mod2 :", paste(vars_Mod2, collapse=" + ")),
-    paste("ModAIC :", deparse(formula(ModAIC)))
-  ),
-  "output/part2/models/model_formulas.txt"
-)
-
-# Save summaries
-capture.output(summary(ModT), file="output/part2/models/ModT_summary.txt")
-capture.output(summary(Mod1), file="output/part2/models/Mod1_summary.txt")
-capture.output(summary(Mod2), file="output/part2/models/Mod2_summary.txt")
-capture.output(summary(ModAIC), file="output/part2/models/ModAIC_summary.txt")
-capture.output(ModAIC$anova, file="output/part2/models/ModAIC_anova.txt")
 
 ####
 #Question 2
@@ -441,27 +405,33 @@ AUC.AIC.test = round(performance(predAIC_test, "auc")@y.values[[1]], 4)
 
 #Build a dataframe to superpose all ROC curves in a single ggplot
 df = data.frame(
-  FPR = c(unlist(ROC.T.train@x.values),
-          unlist(ROC.T.test@x.values),
-          unlist(ROC.1.test@x.values),
-          unlist(ROC.2.test@x.values),
-          unlist(ROC.AIC.test@x.values),
-          c(0, 0, 1),
-          unlist(ROC.T.test@x.values)),
-  TPR = c(unlist(ROC.T.train@y.values),
-          unlist(ROC.T.test@y.values),
-          unlist(ROC.1.test@y.values),
-          unlist(ROC.2.test@y.values),
-          unlist(ROC.AIC.test@y.values),
-          c(0, 1, 1),
-          unlist(ROC.T.test@x.values)),
-  type = factor(rep(1:7, c(length(unlist(ROC.T.train@y.values)),
-                           length(unlist(ROC.T.test@y.values)),
-                           length(unlist(ROC.1.test@y.values)),
-                           length(unlist(ROC.2.test@y.values)),
-                           length(unlist(ROC.AIC.test@y.values)),
-                           3,
-                           length(unlist(ROC.T.test@x.values)))))
+  FPR = c(
+    unlist(ROC.T.train@x.values),
+    unlist(ROC.T.test@x.values),
+    unlist(ROC.1.test@x.values),
+    unlist(ROC.2.test@x.values),
+    unlist(ROC.AIC.test@x.values),
+    c(0, 0, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  TPR = c(
+    unlist(ROC.T.train@y.values),
+    unlist(ROC.T.test@y.values),
+    unlist(ROC.1.test@y.values),
+    unlist(ROC.2.test@y.values),
+    unlist(ROC.AIC.test@y.values),
+    c(0, 1, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  type = factor(rep(1:7, c(
+    length(unlist(ROC.T.train@y.values)),
+    length(unlist(ROC.T.test@y.values)),
+    length(unlist(ROC.1.test@y.values)),
+    length(unlist(ROC.2.test@y.values)),
+    length(unlist(ROC.AIC.test@y.values)),
+    3,
+    length(unlist(ROC.T.test@x.values))
+  )))
 )
 
 #Plot the ROC curves with AUC values in the legend
@@ -504,3 +474,185 @@ capture.output(summary(ModT), file="output/part2/roc/ModT_summary_for_adequacy.t
 capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.txt")
 capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
 capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
+
+####
+#Question 3
+####
+
+#Ridge regression is useful here because many audio predictors are correlated
+dir.create("output/part2/ridge", recursive=TRUE, showWarnings=FALSE)
+
+#Lambda grid for ridge regularization
+grid = 10^seq(10,-2,length=100)
+
+#Build the design matrix and the binary response
+x = as.matrix(train_ModT[, !names(train_ModT) %in% "Y"])
+y = as.numeric(train_ModT$Y == "Jazz")
+
+#Fit the ridge logistic model path
+ridge.fit = glmnet(x, y, alpha=0, lambda=grid, family="binomial")
+saveRDS(ridge.fit, "output/part2/ridge/ridge_fit.rds")
+
+#The intercept evolves from the empirical class proportion to the unpenalized logistic intercept
+coef(ridge.fit)[1,]
+
+#Keep only the coefficients without the intercept
+coef.ridge = coef(ridge.fit)[-1,]
+dim(coef.ridge)
+
+#Compare the two extreme lambda values
+ridge.extremes = cbind(
+  large_lambda = predict(ridge.fit, s=10^(10), type="coefficients")[1:(nrow(coef.ridge)+1),],
+  small_lambda = predict(ridge.fit, s=10^(-2), type="coefficients")[1:(nrow(coef.ridge)+1),]
+)
+capture.output(ridge.extremes, file="output/part2/ridge/ridge_extreme_coefficients.txt")
+
+#Plot the coefficient paths returned by glmnet
+png("output/part2/ridge/ridge_glmnet_plot.png", width=1200, height=900, res=150)
+par(mfrow=c(1,1))
+plot(ridge.fit)
+dev.off()
+
+#Plot the coefficient paths against -log(lambda)
+png("output/part2/ridge/ridge_coefficients_loglambda.png", width=1200, height=900, res=150)
+matplot(-log(grid), t(coef.ridge), type="l", xlab="-log(lambda)", ylab="coefficients")
+dev.off()
+
+####
+#Question 4
+####
+
+dir.create("output/part2/ridge_cv", recursive=TRUE, showWarnings=FALSE)
+
+x.test = as.matrix(test_ModT[, !names(test_ModT) %in% "Y"])
+y.test = as.numeric(test_ModT$Y == "Jazz")
+
+#Fit the ridge path on the training sample
+ridge.fit = glmnet(x, y, alpha=0, lambda=grid, family="binomial")
+
+#Cross-validation estimates the mean prediction error over 10 training folds
+set.seed(1)
+cv.out = cv.glmnet(x, y, alpha=0, nfolds=10, lambda=grid, family="binomial")
+
+#Plot the cross-validation curve
+png("output/part2/ridge_cv/ridge_cv_plot.png", width=1200, height=900, res=150)
+par(mfrow=c(1,1))
+plot(cv.out)
+dev.off()
+
+#Lambda minimizing the cross-validation error
+(bestlam = cv.out$lambda.min)
+log(bestlam)
+
+#Prediction performance on the test sample
+ridge.pred = predict(ridge.fit, s=bestlam, newx=x.test, type="response")
+ridge.performance = mean((ridge.pred - y.test)^2)
+ridge.performance
+
+#Re-estimate the ridge model on the whole training sample with the selected lambda
+ridge.fit.fin = glmnet(x, y, alpha=0, lambda=bestlam, family="binomial")
+
+#Save the fitted objects
+saveRDS(ridge.fit, "output/part2/ridge_cv/ridge_fit_path.rds")
+saveRDS(cv.out, "output/part2/ridge_cv/ridge_cv_out.rds")
+saveRDS(ridge.fit.fin, "output/part2/ridge_cv/ridge_fit_final.rds")
+
+#Save the selected lambda and the final coefficients
+capture.output(bestlam, file="output/part2/ridge_cv/ridge_best_lambda.txt")
+capture.output(ridge.performance, file="output/part2/ridge_cv/ridge_performance.txt")
+capture.output(predict(ridge.fit.fin, type="coefficients")[,1], file="output/part2/ridge_cv/ridge_final_coefficients.txt")
+
+####
+#Question 5
+####
+
+#Load Pretrained models
+
+ModRidge = readRDS("output/part2/ridge_cv/ridge_fit_final.rds")
+
+#Ridge predictions are added on the test sample to complete the ROC comparison
+predR_test = prediction(predict(ModRidge, newx=x.test, type="response"), Y_test)
+
+#Prepare ROC curves with sensitivity and false positive rate
+ROC.R.test = performance(predR_test, "sens", "fpr")
+
+#Compute the area under the ROC curve for each model
+AUC.R.test = round(performance(predR_test, "auc")@y.values[[1]], 4)
+
+#Build a dataframe to superpose all ROC curves in a single ggplot
+df = data.frame(
+  FPR = c(
+    unlist(ROC.T.train@x.values),
+    unlist(ROC.T.test@x.values),
+    unlist(ROC.1.test@x.values),
+    unlist(ROC.2.test@x.values),
+    unlist(ROC.AIC.test@x.values),
+    unlist(ROC.R.test@x.values),
+    c(0, 0, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  TPR = c(
+    unlist(ROC.T.train@y.values),
+    unlist(ROC.T.test@y.values),
+    unlist(ROC.1.test@y.values),
+    unlist(ROC.2.test@y.values),
+    unlist(ROC.AIC.test@y.values),
+    unlist(ROC.R.test@y.values),
+    c(0, 1, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  type = factor(rep(1:8, c(
+    length(unlist(ROC.T.train@y.values)),
+    length(unlist(ROC.T.test@y.values)),
+    length(unlist(ROC.1.test@y.values)),
+    length(unlist(ROC.2.test@y.values)),
+    length(unlist(ROC.AIC.test@y.values)),
+    length(unlist(ROC.R.test@y.values)),
+    3,
+    length(unlist(ROC.T.test@x.values))
+  )))
+)
+
+#Plot the ROC curves with AUC values in the legend
+ROC_plot = ggplot(df, aes(FPR, TPR, color=type, linetype=type)) +
+  geom_line() +
+  labs(title="ROC curves",
+       x="False Positive Rate (1-Specificity)",
+       y="True Positive Rate (Sensitivity)") +
+  scale_color_manual(
+    name="",
+    values=1:8,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  ) +
+  scale_linetype_manual(
+    name="",
+    values=1:8,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  )
+
+ggsave("output/part2/roc/roc_curves_with_ridge.png", ROC_plot, width=12, height=8)
+
+#Save the model summaries for adequacy checks
+capture.output(summary(ModT), file="output/part2/roc/ModT_summary_for_adequacy.txt")
+capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.txt")
+capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
+capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
+capture.output(AUC.R.test, file="output/part2/roc/ModRidge_auc_test.txt")
