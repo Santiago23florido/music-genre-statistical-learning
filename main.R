@@ -26,7 +26,8 @@ gp = ggplot(seeds) +
 ggsave("output/part1/genre_proportions.png", gp)
 prop.table(table(seeds$GENRE))
 
-ncol(seeds)
+n = nrow(seeds)
+p = ncol(seeds)
 
 #Log-transformation diagnostics on positive variables
 numeric_seeds = seeds[, sapply(seeds, is.numeric), drop=FALSE]
@@ -148,12 +149,21 @@ ggsave("output/part1/common_candidates_log_normality.png", common_normality_plot
 # PCA
 #Apply log and center and scale data
 seeds[, c("PAR_SC_V", "PAR_ASC_V")] = log(seeds[, c("PAR_SC_V", "PAR_ASC_V")])
-seeds[, sapply(seeds, is.numeric)] = scale(seeds[, sapply(seeds, is.numeric)], center=TRUE, scale=TRUE)
+seeds[,-p] = scale(seeds[,-p], center=TRUE, scale=TRUE)
 
-n = nrow(seeds)
+#Elimination of variables Highly correlated and nulls
+seeds = seeds[, -unique(which(abs(cor(seeds[,-p])) > 0.99 & upper.tri(cor(seeds[,-p])), arr.ind=TRUE)[,"col"])]
+p = ncol(seeds)
+
+seeds = seeds[, !names(seeds) %in% c("PAR_ASE_M", "PAR_ASE_MV", "PAR_SFM_M", "PAR_SFM_MV")]
+
+
 p = ncol(seeds)
 
 res = PCA(seeds[,-p], graph=FALSE)
+
+
+#Proper values studies
 
 round(res$eig,4) # variance of each axe
 sum(res$eig[,1])
@@ -165,4 +175,9 @@ inertie_percentage = ggplot() + aes(x=1:length(res$eig[,2]), y=res$eig[,2]) + ge
   xlab("Principal component") +
   ylab("Explained inertia (%)")
 ggsave("output/part1/inertie_percentage.png", inertie_percentage)
+
+
+#Correlation of variables studies
+V = res$var
+plot(res,choix="var") 
 
