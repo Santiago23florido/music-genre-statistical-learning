@@ -360,6 +360,43 @@ test_Mod1 = binary_test[, c("Y", vars_Mod1), drop=FALSE]
 train_Mod2 = binary_train[, c("Y", vars_Mod2), drop=FALSE]
 test_Mod2 = binary_test[, c("Y", vars_Mod2), drop=FALSE]
 
+# Reduced logistic models
+Mod1 = glm(Y ~ ., family=binomial, data=train_Mod1)
+Mod2 = glm(Y ~ ., family=binomial, data=train_Mod2)
+
+summary(Mod1)
+summary(Mod2)
+
+# Stepwise AIC logistic model
+ModAIC = stepAIC(ModT)
+
+summary(ModAIC)
+
+ModAIC$anova
+
+# Save fitted models
+saveRDS(ModT, "output/part2/models/ModT.rds")
+saveRDS(Mod1, "output/part2/models/Mod1.rds")
+saveRDS(Mod2, "output/part2/models/Mod2.rds")
+saveRDS(ModAIC, "output/part2/models/ModAIC.rds")
+
+# Save retained variable names
+writeLines(
+  c(
+    paste("ModT :", paste(names(train_ModT)[names(train_ModT) != "Y"], collapse=" + ")),
+    paste("Mod1 :", paste(vars_Mod1, collapse=" + ")),
+    paste("Mod2 :", paste(vars_Mod2, collapse=" + ")),
+    paste("ModAIC :", deparse(formula(ModAIC)))
+  ),
+  "output/part2/models/model_formulas.txt"
+)
+
+# Save summaries
+capture.output(summary(ModT), file="output/part2/models/ModT_summary.txt")
+capture.output(summary(Mod1), file="output/part2/models/Mod1_summary.txt")
+capture.output(summary(Mod2), file="output/part2/models/Mod2_summary.txt")
+capture.output(summary(ModAIC), file="output/part2/models/ModAIC_summary.txt")
+capture.output(ModAIC$anova, file="output/part2/models/ModAIC_anova.txt")
 
 ####
 #Question 2
