@@ -5,6 +5,7 @@ library(ggplot2)
 library(FactoMineR)
 library(factoextra)
 library(cluster)
+library(MASS)
 
 rm(list=objects())
 graphics.off(); seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
@@ -150,26 +151,24 @@ common_normality_plot = ggplot(common_normality) +
   ylab("Shapiro-Wilk statistic on log(x)")
 ggsave("output/part1/common_candidates_log_normality.png", common_normality_plot)
 
-# PCA
-#Apply log and center and scale data
-seeds[, c("PAR_SC_V", "PAR_ASC_V")] = log(seeds[, c("PAR_SC_V", "PAR_ASC_V")])
-seeds[,-p] = scale(seeds[,-p], center=TRUE, scale=TRUE)
+# Shared preprocessing for the retained variables
+seeds_filtered = seeds
+seeds_filtered[, c("PAR_SC_V", "PAR_ASC_V")] = log(seeds_filtered[, c("PAR_SC_V", "PAR_ASC_V")])
+seeds_filtered = seeds_filtered[, -unique(which(abs(cor(seeds_filtered[,-p])) > 0.99 & upper.tri(cor(seeds_filtered[,-p])), arr.ind=TRUE)[,"col"])]
+seeds_filtered = seeds_filtered[, !names(seeds_filtered) %in% c("PAR_ASE_M", "PAR_ASE_MV", "PAR_SFM_M", "PAR_SFM_MV")]
+p_filtered = ncol(seeds_filtered)
 
-#Elimination of variables Highly correlated and nulls
-seeds = seeds[, -unique(which(abs(cor(seeds[,-p])) > 0.99 & upper.tri(cor(seeds[,-p])), arr.ind=TRUE)[,"col"])]
-p = ncol(seeds)
-
-seeds = seeds[, !names(seeds) %in% c("PAR_ASE_M", "PAR_ASE_MV", "PAR_SFM_M", "PAR_SFM_MV")]
-
-
-p = ncol(seeds)
+# PCA-specific scaling
+seeds_pca = seeds_filtered
+seeds_pca[,-p_filtered] = scale(seeds_pca[,-p_filtered], center=TRUE, scale=TRUE)
+p_pca = ncol(seeds_pca)
 
 
 ####
 #Question 2
 ####
 
-res = PCA(seeds[,-p],ncp=40, graph=FALSE)
+res = PCA(seeds_pca[,-p_pca],ncp=40, graph=FALSE)
 #Proper values study
 
 round(res$eig,4) # variance of each axe
@@ -177,7 +176,7 @@ sum(res$eig[,1])
 
 #Inertie percetage of each component
 inertie_percentage = ggplot() + aes(x=1:length(res$eig[,2]), y=res$eig[,2]) + geom_col() + 
-  geom_hline(yintercept=100/p, lty=2) +
+  geom_hline(yintercept=100/p_pca, lty=2) +
   ggtitle("Percentage of Inertia Explained by Each Principal Component") +
   xlab("Principal component") +
   ylab("Explained inertia (%)")
@@ -191,13 +190,13 @@ V$cos2
 
 #First principal plane
 #LLM suggestion for use of fviz_pca_ind to adequatly represent the genre in the  PCA graphs
-plt1 = factoextra::fviz_pca_ind(res, axes = c(1,2), habillage = seeds[,p], label = "none")
+plt1 = factoextra::fviz_pca_ind(res, axes = c(1,2), habillage = seeds_pca[,p_pca], label = "none")
 plt2 = plot(res, axes = c(1,2), choix = "var")
 pca_first_plane = cowplot::plot_grid(plt1, plt2, ncol = 2, nrow = 1)
 ggsave("output/part1/pca_first_plane.png", pca_first_plane, width = 14, height = 6)
 
 #Second principal plane
-plt3 = factoextra::fviz_pca_ind(res, axes = c(3,4), habillage = seeds[,p], label = "none")
+plt3 = factoextra::fviz_pca_ind(res, axes = c(3,4), habillage = seeds_pca[,p_pca], label = "none")
 plt4 = plot(res, axes = c(3,4), choix = "var")
 pca_second_plane = cowplot::plot_grid(plt3, plt4, ncol = 2, nrow = 1)
 ggsave("output/part1/pca_second_plane.png", pca_second_plane, width = 14, height = 6)
@@ -226,14 +225,15 @@ for (k in c(4, 6, 10, 34)) {
 #Question 3
 ####
 
-genre = as.integer(as.factor(seeds[,p]))
-k_grp = nlevels(as.factor(seeds[,p]))
+genre = as.integer(as.factor(seeds_pca[,p_pca]))
+k_grp = nlevels(as.factor(seeds_pca[,p_pca]))
 
 #Hclust estimation for all ACP resultant candidates 4 6 10 34
 dir.create("output/part1/hclust_pca/not_normalized", recursive=TRUE, showWarnings=FALSE)
 dir.create("output/part1/hclust_pca/normalized", recursive=TRUE, showWarnings=FALSE)
 
 #Hclust estimation for all ACP resultant candidates 4 6 10 34
+#ggplot +ggsave  rendering to expensive LLM suggestion to implement png + plot suggested
 for (mode in c("not_normalized", "normalized")) {
   for (d in c(4, 6, 10, 34)) {
     X_acp = res$ind$coord[, 1:d, drop=FALSE]
@@ -320,8 +320,78 @@ train = sample(c(TRUE, FALSE), n, replace=TRUE, prob=c(2/3, 1/3))
 
 #Restrict to Classical and Jazz for binary classification
 binary_genres = c("Classical", "Jazz")
-binary_train = seeds[train & seeds[,p] %in% binary_genres, ]
-binary_test = seeds[!train & seeds[,p] %in% binary_genres, ]
+binary_train = seeds_filtered[train & seeds_filtered[,p_filtered] %in% binary_genres, ]
+binary_test = seeds_filtered[!train & seeds_filtered[,p_filtered] %in% binary_genres, ]
 
 #Check the requested sample sizes
 c(nrow(binary_train), nrow(binary_test))
+
+####
+#Question 1
+####
+#Directory for output storage
+dir.create("output/part2/models", recursive=TRUE, showWarnings=FALSE)
+
+binary_train$Y = factor(binary_train$GENRE, levels=c("Classical", "Jazz"))
+binary_test$Y = factor(binary_test$GENRE, levels=c("Classical", "Jazz"))
+
+# Full logistic model with all retained variables
+train_ModT = binary_train[, !names(binary_train) %in% "GENRE"]
+test_ModT = binary_test[, !names(binary_test) %in% "GENRE"]
+
+ModT = glm(Y ~ ., family=binomial, data=train_ModT)
+summary(ModT)
+
+coef_ModT = summary(ModT)$coefficients
+
+# Significant variables in ModT
+vars_Mod1 = rownames(coef_ModT)[coef_ModT[,4] < 0.05]
+vars_Mod1 = vars_Mod1[vars_Mod1 != "(Intercept)"]
+
+vars_Mod2 = rownames(coef_ModT)[coef_ModT[,4] < 0.20]
+vars_Mod2 = vars_Mod2[vars_Mod2 != "(Intercept)"]
+
+# Reduced datasets for Mod1 and Mod2
+train_Mod1 = binary_train[, c("Y", vars_Mod1), drop=FALSE]
+test_Mod1 = binary_test[, c("Y", vars_Mod1), drop=FALSE]
+
+train_Mod2 = binary_train[, c("Y", vars_Mod2), drop=FALSE]
+test_Mod2 = binary_test[, c("Y", vars_Mod2), drop=FALSE]
+
+# Reduced logistic models
+Mod1 = glm(Y ~ ., family=binomial, data=train_Mod1)
+Mod2 = glm(Y ~ ., family=binomial, data=train_Mod2)
+
+summary(Mod1)
+summary(Mod2)
+
+# Stepwise AIC logistic model
+ModAIC = stepAIC(ModT)
+
+summary(ModAIC)
+
+ModAIC$anova
+
+# Save fitted models
+saveRDS(ModT, "output/part2/models/ModT.rds")
+saveRDS(Mod1, "output/part2/models/Mod1.rds")
+saveRDS(Mod2, "output/part2/models/Mod2.rds")
+saveRDS(ModAIC, "output/part2/models/ModAIC.rds")
+
+# Save retained variable names
+writeLines(
+  c(
+    paste("ModT :", paste(names(train_ModT)[names(train_ModT) != "Y"], collapse=" + ")),
+    paste("Mod1 :", paste(vars_Mod1, collapse=" + ")),
+    paste("Mod2 :", paste(vars_Mod2, collapse=" + ")),
+    paste("ModAIC :", deparse(formula(ModAIC)))
+  ),
+  "output/part2/models/model_formulas.txt"
+)
+
+# Save summaries
+capture.output(summary(ModT), file="output/part2/models/ModT_summary.txt")
+capture.output(summary(Mod1), file="output/part2/models/Mod1_summary.txt")
+capture.output(summary(Mod2), file="output/part2/models/Mod2_summary.txt")
+capture.output(summary(ModAIC), file="output/part2/models/ModAIC_summary.txt")
+capture.output(ModAIC$anova, file="output/part2/models/ModAIC_anova.txt")

@@ -1,0 +1,128 @@
+
+Call:
+glm(formula = Y ~ PAR_TC + PAR_SC + PAR_ASE1 + PAR_ASE2 + PAR_ASE3 + 
+    PAR_ASE4 + PAR_ASE9 + PAR_ASE12 + PAR_ASE13 + PAR_ASE16 + 
+    PAR_ASE17 + PAR_ASE18 + PAR_ASE19 + PAR_ASE20 + PAR_ASE22 + 
+    PAR_ASE23 + PAR_ASE24 + PAR_ASE28 + PAR_ASE29 + PAR_ASE30 + 
+    PAR_ASE31 + PAR_ASE33 + PAR_ASE34 + PAR_ASEV2 + PAR_ASEV3 + 
+    PAR_ASEV4 + PAR_ASEV6 + PAR_ASEV8 + PAR_ASEV19 + PAR_ASEV20 + 
+    PAR_ASEV24 + PAR_ASEV25 + PAR_ASEV26 + PAR_ASEV28 + PAR_ASEV29 + 
+    PAR_ASEV32 + PAR_ASEV33 + PAR_ASEV34 + PAR_ASC + PAR_ASC_V + 
+    PAR_ASS + PAR_ASS_V + PAR_SFM3 + PAR_SFM5 + PAR_SFM6 + PAR_SFM7 + 
+    PAR_SFM10 + PAR_SFM14 + PAR_SFM16 + PAR_SFM18 + PAR_SFM19 + 
+    PAR_SFM20 + PAR_SFM22 + PAR_SFM23 + PAR_SFM24 + PAR_SFMV1 + 
+    PAR_SFMV3 + PAR_SFMV4 + PAR_SFMV9 + PAR_SFMV11 + PAR_SFMV13 + 
+    PAR_SFMV16 + PAR_SFMV17 + PAR_SFMV18 + PAR_SFMV19 + PAR_SFMV20 + 
+    PAR_SFMV24 + PAR_MFCC1 + PAR_MFCC3 + PAR_MFCC4 + PAR_MFCC6 + 
+    PAR_MFCC8 + PAR_MFCC9 + PAR_MFCC10 + PAR_MFCC11 + PAR_MFCC12 + 
+    PAR_MFCC15 + PAR_MFCC16 + PAR_MFCC17 + PAR_MFCC19 + PAR_THR_2RMS_TOT + 
+    PAR_THR_3RMS_TOT + PAR_THR_1RMS_10FR_MEAN + PAR_THR_2RMS_10FR_VAR + 
+    PAR_THR_3RMS_10FR_MEAN + PAR_PEAK_RMS10FR_MEAN + PAR_PEAK_RMS10FR_VAR + 
+    PAR_3RMS_TCD + PAR_1RMS_TCD_10FR_VAR + PAR_2RMS_TCD_10FR_MEAN + 
+    PAR_3RMS_TCD_10FR_MEAN, family = binomial, data = train_ModT)
+
+Coefficients:
+                         Estimate Std. Error z value Pr(>|z|)    
+(Intercept)             3.194e+02  6.218e+01   5.137 2.79e-07 ***
+PAR_TC                 -5.306e-01  2.652e-01  -2.001 0.045425 *  
+PAR_SC                  3.679e-03  2.350e-03   1.566 0.117427    
+PAR_ASE1               -1.303e+02  2.050e+01  -6.357 2.05e-10 ***
+PAR_ASE2                2.101e+02  2.947e+01   7.129 1.01e-12 ***
+PAR_ASE3               -8.262e+01  2.974e+01  -2.778 0.005464 ** 
+PAR_ASE4                7.723e+01  2.471e+01   3.125 0.001777 ** 
+PAR_ASE9                2.803e+01  1.130e+01   2.480 0.013141 *  
+PAR_ASE12               8.380e+01  1.199e+01   6.988 2.80e-12 ***
+PAR_ASE13               3.024e+01  1.156e+01   2.616 0.008900 ** 
+PAR_ASE16              -4.397e+01  1.632e+01  -2.694 0.007055 ** 
+PAR_ASE17              -4.307e+01  1.740e+01  -2.475 0.013315 *  
+PAR_ASE18               5.744e+01  2.186e+01   2.627 0.008608 ** 
+PAR_ASE19               6.082e+01  1.807e+01   3.366 0.000763 ***
+PAR_ASE20              -7.293e+01  2.142e+01  -3.404 0.000663 ***
+PAR_ASE22               5.007e+01  2.316e+01   2.162 0.030628 *  
+PAR_ASE23               8.282e+01  3.043e+01   2.722 0.006493 ** 
+PAR_ASE24               9.999e+01  3.012e+01   3.320 0.000901 ***
+PAR_ASE28              -1.577e+02  3.462e+01  -4.556 5.20e-06 ***
+PAR_ASE29              -6.219e+01  2.575e+01  -2.415 0.015714 *  
+PAR_ASE30               1.848e+02  2.756e+01   6.705 2.02e-11 ***
+PAR_ASE31              -7.834e+01  2.270e+01  -3.451 0.000559 ***
+PAR_ASE33               6.893e+03  7.515e+02   9.173  < 2e-16 ***
+PAR_ASE34              -6.819e+03  7.529e+02  -9.058  < 2e-16 ***
+PAR_ASEV2               2.476e+03  8.120e+02   3.050 0.002292 ** 
+PAR_ASEV3              -4.133e+03  1.209e+03  -3.418 0.000631 ***
+PAR_ASEV4               2.452e+03  1.035e+03   2.370 0.017793 *  
+PAR_ASEV6              -1.155e+03  5.712e+02  -2.022 0.043223 *  
+PAR_ASEV8              -1.063e+03  4.947e+02  -2.148 0.031701 *  
+PAR_ASEV19             -1.280e+03  5.876e+02  -2.178 0.029390 *  
+PAR_ASEV20             -1.814e+03  5.550e+02  -3.268 0.001083 ** 
+PAR_ASEV24              3.574e+03  9.262e+02   3.858 0.000114 ***
+PAR_ASEV25              4.833e+03  1.016e+03   4.758 1.95e-06 ***
+PAR_ASEV26              2.555e+03  9.741e+02   2.623 0.008727 ** 
+PAR_ASEV28              5.839e+03  1.406e+03   4.151 3.30e-05 ***
+PAR_ASEV29             -3.268e+03  1.375e+03  -2.377 0.017472 *  
+PAR_ASEV32              1.144e+03  5.995e+02   1.909 0.056326 .  
+PAR_ASEV33             -4.125e+04  2.286e+04  -1.805 0.071112 .  
+PAR_ASEV34              3.811e+04  2.304e+04   1.654 0.098125 .  
+PAR_ASC                -5.116e+00  1.020e+00  -5.017 5.25e-07 ***
+PAR_ASC_V              -6.243e-01  2.127e-01  -2.936 0.003329 ** 
+PAR_ASS                -3.844e+00  1.233e+00  -3.117 0.001830 ** 
+PAR_ASS_V               1.591e+01  2.582e+00   6.163 7.16e-10 ***
+PAR_SFM3               -5.017e+01  7.766e+00  -6.460 1.05e-10 ***
+PAR_SFM5               -2.885e+01  1.071e+01  -2.693 0.007091 ** 
+PAR_SFM6               -3.506e+01  1.449e+01  -2.419 0.015548 *  
+PAR_SFM7               -3.556e+01  1.946e+01  -1.827 0.067655 .  
+PAR_SFM10               1.006e+02  1.526e+01   6.592 4.34e-11 ***
+PAR_SFM14              -9.657e+01  1.600e+01  -6.037 1.57e-09 ***
+PAR_SFM16               2.030e+02  2.346e+01   8.655  < 2e-16 ***
+PAR_SFM18               2.814e+01  1.813e+01   1.552 0.120590    
+PAR_SFM19              -6.825e+01  2.933e+01  -2.327 0.019955 *  
+PAR_SFM20              -1.019e+02  2.808e+01  -3.628 0.000286 ***
+PAR_SFM22               1.003e+02  1.208e+01   8.301  < 2e-16 ***
+PAR_SFM23              -4.080e+01  1.513e+01  -2.696 0.007015 ** 
+PAR_SFM24              -3.073e+03  7.215e+02  -4.259 2.05e-05 ***
+PAR_SFMV1              -2.539e+02  9.808e+01  -2.588 0.009641 ** 
+PAR_SFMV3               5.121e+02  2.676e+02   1.914 0.055619 .  
+PAR_SFMV4               4.343e+02  2.859e+02   1.519 0.128812    
+PAR_SFMV9               8.244e+02  5.756e+02   1.432 0.152049    
+PAR_SFMV11              3.957e+03  1.253e+03   3.158 0.001586 ** 
+PAR_SFMV13              1.166e+03  4.108e+02   2.838 0.004534 ** 
+PAR_SFMV16             -5.168e+03  1.322e+03  -3.909 9.27e-05 ***
+PAR_SFMV17             -6.433e+02  4.173e+02  -1.541 0.123197    
+PAR_SFMV18              9.618e+02  5.991e+02   1.605 0.108424    
+PAR_SFMV19             -3.689e+03  1.182e+03  -3.120 0.001809 ** 
+PAR_SFMV20              3.326e+03  1.365e+03   2.436 0.014862 *  
+PAR_SFMV24             -1.645e+05  5.450e+04  -3.018 0.002545 ** 
+PAR_MFCC1              -1.261e+00  5.409e-01  -2.332 0.019711 *  
+PAR_MFCC3              -7.743e+00  1.225e+00  -6.319 2.64e-10 ***
+PAR_MFCC4               2.200e+00  1.058e+00   2.080 0.037569 *  
+PAR_MFCC6              -4.144e+00  9.016e-01  -4.596 4.30e-06 ***
+PAR_MFCC8               7.799e+00  1.171e+00   6.661 2.72e-11 ***
+PAR_MFCC9              -2.254e+00  1.208e+00  -1.866 0.062027 .  
+PAR_MFCC10              6.085e+00  1.360e+00   4.474 7.67e-06 ***
+PAR_MFCC11             -5.600e+00  1.354e+00  -4.136 3.53e-05 ***
+PAR_MFCC12              5.455e+00  1.471e+00   3.708 0.000209 ***
+PAR_MFCC15              4.908e+00  2.178e+00   2.253 0.024265 *  
+PAR_MFCC16              6.539e+00  1.648e+00   3.968 7.24e-05 ***
+PAR_MFCC17              8.316e+00  2.243e+00   3.708 0.000209 ***
+PAR_MFCC19             -8.288e+00  1.932e+00  -4.290 1.79e-05 ***
+PAR_THR_2RMS_TOT       -1.390e+02  2.958e+01  -4.700 2.60e-06 ***
+PAR_THR_3RMS_TOT       -1.828e+02  6.097e+01  -2.999 0.002712 ** 
+PAR_THR_1RMS_10FR_MEAN  8.218e+01  1.482e+01   5.545 2.95e-08 ***
+PAR_THR_2RMS_10FR_VAR  -5.321e+03  2.613e+03  -2.036 0.041721 *  
+PAR_THR_3RMS_10FR_MEAN  4.948e+02  9.903e+01   4.997 5.83e-07 ***
+PAR_PEAK_RMS10FR_MEAN  -6.395e-02  1.836e-02  -3.482 0.000497 ***
+PAR_PEAK_RMS10FR_VAR    1.247e-04  5.669e-05   2.199 0.027851 *  
+PAR_3RMS_TCD            8.479e+02  1.897e+02   4.469 7.86e-06 ***
+PAR_1RMS_TCD_10FR_VAR  -1.125e+03  3.812e+02  -2.952 0.003154 ** 
+PAR_2RMS_TCD_10FR_MEAN  2.369e+02  6.586e+01   3.596 0.000323 ***
+PAR_3RMS_TCD_10FR_MEAN -4.159e+02  1.811e+02  -2.297 0.021642 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 3941.8  on 2850  degrees of freedom
+Residual deviance: 1024.9  on 2759  degrees of freedom
+AIC: 1208.9
+
+Number of Fisher Scoring iterations: 9
+

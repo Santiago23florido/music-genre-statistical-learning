@@ -1,323 +1,282 @@
-## STA3 - TP7- GHQ
-#  setwd("mon répertoire")
-rm(list=objects()) ; graphics.off()
+#STA1
+setwd("mon_repertoire")
 library(ggplot2)
+rm(list=objects());graphics.off()
 
-# lecture des données et étude descriptive sommaire
-df = read.table("GHQ.data",header=TRUE)
-summary(df)
-str(df)
+########################## Détecteur de spam  ###################
+#### TREVOR et HASTIE http://www-stat.stanford.edu/~tibs/ElemStatLearn/
 
-# on souhaite modéliser la probabilité d'être atteint de la maladie
-# en fonction de deux variables (sex quantitative, ghq quatitative)
-# Données groupées: K=17 groupes de taille nk=cases+noncases différentes
-# d'où la création d'une variable taille
-df$tot = df$noncases+df$cases
+#commandes du TP précedent
 
-# une variable proportion observée
-df$prop = df$cases/df$tot
+spam = read.table("spam.data")
+dim(spam) # 4601 x 58
+p = ncol(spam)-1          # nombre de variables explicatives
+n = nrow(spam)
+names(spam)[p+1] = "Y"
+
+###################################
+### Q1 - classification 
+###################################
+
+# seuil de la règle de Bayes = 0.5
+res = glm(Y~.,data=spam,family=binomial)         # estimation
+predproba = predict(res,type="response")         # prédiction en proba
+
+glm.pred = ifelse(predproba>.5,1,0)
+
+# Rem
+sum(abs(glm.pred-as.numeric(predproba>.5)))
+
+# table de classification
+table(Y=spam$Y , glm.pred )
+1-mean(glm.pred==spam$Y) #0.06868072= taux de mauvais classement
+mean(glm.pred!=spam$Y)
+
+# on peut tracer les faux positifs et faux négatifs en fonction du seuil
+seuil = seq(0,1,0.01)
+
+# nombre de faux positifs et faux négatifs en fonction du seuil
+# sapply pour transformer la liste en vecteur
+nbspam = sum(spam$Y)   # nombre de spams
+FP = sapply(seuil,function(s)  sum( predproba>=s & spam$Y==0))
+FN = sapply(seuil,function(s)  sum( predproba< s & spam$Y==1))
+VP = nbspam - FN
+VN = (n-nbspam) - FP
+
+## alternative:
+# on peut calculer à partir de la table de classification pour différents seuils
+# mais c'est un peu plus compliqué car table ne renvoie que deux valeurs pour s=0 et s=1
+table(Y=spam$Y,pred=predproba>0)
+sap = sapply(seq(0.01,0.99,0.01),
+             function(x){c(table(Y=spam$Y,pred=predproba>x))})
+
+# ajout des cas spéciaux s=0 et s=1 
+# (pb avec table qui ne renvoie alors que deux valeurs)
+
+tc = data.frame(seuil,rbind(c(0,0,n-nbspam, nbspam), # s = 0
+                            t(sap),  # VN, FN, FP, VP pour les seuils de 0.01 à 0.99
+                            c( n-nbspam,nbspam,0,0))) # s = 1
+names(tc)[2:5] = c("VN","FN","FP","VP")
+FP = tc$FP; FN = tc$FN; VP = tc$VP; VN = tc$VN
+
+## Fin de l'alternative
+
+# le plot
+matplot(seuil,cbind(FN,FP,FN+FP),
+        type="l",ylab="erreur",
+        lty=c(2,3,1),col=c("red","brown","black"))
+
+legend("top",c("FN","FP","totale"),lty=c(2,3,1),col=c("red","brown","black"))
 
 
-###################
-### 1- régression linéaire
-###################
-### P_k= a+b ghq_k + eps_k indep eps_k iid gaussien
+# avec ggplot2 pour gérer des séries chronologiques
+library(zoo)
+plt = autoplot(zoo(data.frame(FN,FP,tot=FN+FP),
+                   order.by=seuil),
+         facet = NULL) +  geom_line()
 
-res.lm = lm(prop~ghq,data=df);summary(res.lm)
-#            Estimate Std. Error t value Pr(>|t|)    
-#(Intercept)  0.18938    0.08857   2.138   0.0494 *  
-#  ghq        0.11233    0.01667   6.739 6.65e-06 ***
-#Residual standard error: 0.2094 on 15 degrees of freedom
-#Multiple R-squared: 0.7517,  Adjusted R-squared: 0.7352 
-#F-statistic: 45.41 on 1 and 15 DF,  p-value: 6.648e-06 
+#le seuil minimum (estimé)
+wm = which.min(FN+FP)                # index dans seuil
+me = (FN+FP)[wm]                     # erreur min 
+c(seuil[wm], (FN+FP)[wm]/n)          # s=0.43 mean err=0.065
 
-# cette F-statistique est la stat de test de significativité globale
-# H0: modèle iid (coeff associé à ghq=0, ie b=0) contre H1: modèle d'étude (b<>0)
-# (SCR(iid) - SCR(modèle))/( SCR(modèle)/différence de ddl)
+plt + geom_point(aes(x=seuil[wm],y=(FN+FP)[wm]),  pch=19,col=2)
+# le seuil théorique est à 0.5. 
+# noter la forme de la courbe autour entre 0.4 et 0.6
 
-# comme c'est une régression simple, F est égale au carré de la stat de Student
-# de nullité du coefficient b
-(6.739)^2 # > qf(.95,1,15) donc le coefficient est significatif au risque (de première espèce 5%)
+VP[wm]/nbspam      # sensibilité = 0.916 on arrête 92% de spams
+FP[wm]/(n-nbspam)  # 1-specificité = 5% des courriers ordinaires passent en spam
 
-# ggplot (attention, si on met col et pch dans ggplot,  deux régressions sont faites)
-plt = ggplot(data=df)+ aes(x=ghq, y=prop)+
-   geom_point(aes(x=ghq, y=prop, col=sex, pch=sex), size=3)+
-   stat_smooth(method="lm",formula=y~x, se=FALSE,col=1)+
-  labs(y="proportion de cas")
-plt
-# la probabilité d'être atteint alors qu'on a un score > 6 est >1
+###################################
+### Q2- ROC 
+###################################
 
-# on voit un (léger) pattern dans les résidus
+## à la main
+
+#seuil s
+seuil = seq(0,1,.01)
+
+# on recalcule (pour bien comprendre 1-specificité et sensibilité)
+cv_ROC= sapply(seuil,function(s)  {c(
+        #1-specificité = FPR = FP/NEG=taux faux positifs
+  x_ROC = sum( predproba>=s & spam$Y==0)/sum(spam$Y==0), 
+        #sensibilité = TPR= VP/POS = Taux de vrais positifs 
+  y_ROC = sum( predproba>=s & spam$Y==1)/sum(spam$Y==1))})
+
+plot(cv_ROC[1,],cv_ROC[2,],type="l")
+lines(c(0,1),c(0,1),lty=2)          # règle aléatoire
+
+# on peut aussi utiliser les calculs de la question précédente
+x_ROC = FP / (n-nbspam) #1-specificité  
+y_ROC = VP / nbspam     #sensibilité
+
+sum(x_ROC!=cv_ROC[1,])
+
+### en utilisant library(ROCR)
+library(ROCR)
+pred = prediction(predproba,spam$Y)  
+
+# sort un objet de type prediction (qui calcul les TP, FN, etc en fonction du seuil)
+#objet S4, syntaxe particulière pour accéder aux composantes
+class(pred) 
+mode(pred) # "S4"
+slotNames(pred)
+# [1] "predictions" "labels"      "cutoffs"     "fp"          "tp"          "tn"          "fn"         
+# [8] "n.pos"       "n.neg"       "n.pos.pred"  "n.neg.pred" 
+
+# accéder aux FP
+slot(pred,"fp")       # les informations à disposition
+class(pred@fp)        # c'est une liste qui contient un vecteur des prédictions
+head(unlist(pred@fp)) # le vecteur des faux positifs
+
+### courbe ROC
+ROC = performance(pred,"sens","fpr")  # prépare les infos pour la courbe ROC
+plot(ROC, xlab="", main="courbes ROC")               
+lines(c(0,1),c(0,1),lty=2)          # règle aléatoire 
+
+#  lines(cv_ROC[1,],cv_ROC[2,],type="l",col=2) 
+# toutes petites différences, dues à la discrétisation du seuil
+
+### AUC
+perf = performance(pred, "auc")
+slotNames(perf)
+(AUC=round(unlist(perf@y.values),4) ) #AUC = 0.9774
+
+
+###################################
+###  blocage de 95% des spams
+
+a = min(which(unlist(ROC@y.values) >= 0.95)) # numéro de l'obs de sensibilité>95%: 1867
+s = unlist(ROC@alpha.values)[a]              # seuil= s =0.2793256
+ROC@x.values[[1]][a]                      # tx de faux positif :  1 - beta = 0.108
+
+pred95 = ifelse(predproba>s,1,0)
+table(Y=spam$Y, pred95 = pred95)
+#    pred95
+# Y      0    1
+#   0 2486  302
+#   1   91 1722
+
+# on vérifie :
+1722/(1722+91)  # [1] 0.9498069 95% des spams bloqués
+302/(302+2486)  # 0.1083214: faux positifs
+mean(pred95==spam$Y) #0.9145838 et une erreur totale plus forte
+
+###################################
+###  Q3 modèle plus simple avec les variables les plus significatives
+###################################
+
+res2 = glm(Y~V5+V6+V7+V8+V16+V17+V21+V23+V25+V27+V45+V46+V52+V53+V56+V57,
+           family=binomial,data=spam)
+
+glm.pred2 = ifelse(predict(res2,type="response")>.5,1,0)
+
+table(Y=spam$Y, glm.pred2 )
+mean(glm.pred2!=spam$Y) # 0.08367746 # légèrement moins bon
+
+# modèle M2: erreur supérieure, mais attention, il y a moins de variables
+# on ne peut donc prendre une décision définitive (il faudrait avoir un échantillon test)
+
+pred2 = prediction(predict(res2,type="response"),spam$Y)
+ROC2 = performance(pred2,"sens","fpr")
+plot(ROC2,xlab="", main="courbes ROC", col = 2,
+     add =TRUE)     # pour superposer au graphe précédent           
+
+(AUC2 =  round (performance(pred2, 'auc')@y.values[[1]] , 4) ) # 0.9689
+
+
+####################
+### avec LDA
+####################
 library(MASS)
-plot(df$ghq,studres(res.lm)) # motif dans les résidus
+res.lda = lda(Y ~ ., spam)
 
-par(mfrow=c(2,2))            # d'autres représentations
-plot(res.lm)
-par(mfrow=c(1,1))
+#proba
+res.lda$prior       # on retrouve l'estimation des proportions
 
-# glm fait aussi du lm...
-summary(glm(prop~ghq,data=df))  
-#               Estimate Std. Error t value Pr(>|t|)    
-# (Intercept)    0.18938    0.08857   2.138   0.0494 *  
-#   ghq          0.11233    0.01667   6.739 6.65e-06 ***
-# (Dispersion parameter for Gaussian family taken to be 0.04386396) => RSE^2
-# 
-# Null deviance: 2.64999  on 16  degrees of freedom
-# Residual deviance: 0.65796  on 15  degrees of freedom
+# aggregate calcule des statistiques par niveau [première colonne: groupe]
+mb_k = sapply(spam[,-(p+1)], function(x) tapply(x,spam$Y, mean) )
+mb_k
 
-# on fait le lien entre les sorties de lm 
-# et celles de glm (par défaut, fait de la régression linéaire)
+res.lda$means       # on retrouve l'estimation des moyennes
 
-# le param de dispersion (glm) = RSE^2 où RSE est une sortie de lm
-c(0.65796/15)                           # 0.043864
-# et sa racine carré (RSE), estimation de sigma, l'écart-type du bruit
-sqrt(c(0.65796/15, 0.0438639) )         # 0.2094372  
-# remarquons que le calcul (Null deviance - Residual deviance)/(Residual deviance/15) 
-# permet de retrouver la stat de significativité globale de la régression
-# 
-(2.64999 - 0.65796)/( 0.65796  / 15)    # 45.41382  => F stat
+# variance totale
+var(spam-mb_k[spam$Y,])
 
+# variance par groupe
+V_k = by(as.matrix(spam[,-(p+1)]),list(as.factor(spam$Y)),cov) 
 
-###################
-### 2- régression logistique en données groupées
-###################
-### cases_k~B(noncases, pi_k) indep avec logit(pi_k)= a+b ghq_k
+# performance (sur l'apprentissage)
+1-mean(spam$Y==predict(res.lda, spam)$class)  # 0.111
+pred.lda = predict(res.lda, spam)$posterior[,2]  # pour p(Y=1|x)
 
-res.glm = glm(cbind(cases,noncases)~ghq,
-            family=binomial,data=df)
-summary(res.glm)
-# Coefficients:
-#             Estimate Std. Error z value Pr(>|z|)    
-# (Intercept)  -3.4536     0.5633  -6.131 8.73e-10 ***
-# ghq           1.4402     0.2979   4.834 1.34e-06 ***
-#   ---
-# (Dispersion parameter for binomial family taken to be 1)
-# 
-# Null deviance: 83.176  on 16  degrees of freedom
-# Residual deviance:  5.744  on 15  degrees of freedom
-# AIC: 22.22
-# 
-# Number of Fisher Scoring iterations: 6
+(AUC.lda =  round (performance(prediction(pred.lda,spam$Y), 'auc')@y.values[[1]] , 4) ) # 0.9543
+ROC.lda = performance(prediction(pred.lda,spam$Y),"sens","fpr")
+plot(ROC.lda,xlab="", main="courbes ROC", col = 3,  add =TRUE) 
 
-###################
-### 3- Représentation graphique
-###################
-  
+####################
+### avec QDA
+####################
+res.qda = qda(Y ~ ., spam)
 
-# tracé des prédictions
-# construire une fonction
-f = function(x,a,b)    1/(1+exp(-a-b*x))  
-par(mfrow=c(1,1))
-plt = plt + stat_function(fun=function(x)f(x,a=res.glm$coef[1],b= res.glm$coef[2]),
-                          col="red",lwd=1, lty=2)
-plt
+1-mean(spam$Y==predict(res.qda, spam)$class)  # 0.1671376
 
-# la loi binomiale est évidemment adaptée pour modéliser un phénomène binaire.
-# le modèle de régression logistique permet de modéliser une probabilité
-# comprise entre 0 et 1, dépend de covariables explicatives.
-# visuellement, l'ajustement est meilleur.
+pred.qda = predict(res.qda, spam)$posterior[,2]
+(AUC.qda =  round (performance(prediction(pred.qda,spam$Y), 'auc')@y.values[[1]] , 4) ) #  0.9509
 
-###################
-### 4- ICs
-###################
-# loi asymptotique de l'EMV
-# (vcov)^{-1/2} (thetachap-theta) -> loi N(0,Id)
-# l'approximpation gaussienne est utilisée à distance finie
-alpha = 0.05
-q = qnorm(1-alpha/2)  
+ROC.qda = performance(prediction(pred.qda,spam$Y),"sens","fpr")
+plot(ROC.qda,xlab="", main="courbes ROC", col = 4,  add =TRUE) 
 
-# IC de l'intercept
-a = res.glm$coef[1]
-s.est = sqrt(vcov(res.glm)[1,1])
-ICint = c(est=a,min=a-q*s.est,max=a+q*s.est)  #l'IC
-# est.(Intercept) min.(Intercept) max.(Intercept) 
-#       -3.453574       -4.557608       -2.349539
+legend("bottomright",legend= c(paste("AUC M: ",AUC),
+                               paste("AUC M2: ",AUC2),
+                               paste("AUC lda: ",AUC.lda),
+                               paste("AUC qda: ",AUC.qda)), 
+       col=1:4, lty=1)
 
-# IC de la "pente", coefficient associé à ghq
-b = res.glm$coef[2]
-s.est = sqrt(vcov(res.glm)[2,2])
-ICghq = c(est=b,min=b-q*s.est,max=b+q*s.est)  #l'IC
-#   est.ghq   min.ghq   max.ghq 
-# 1.4402323 0.8562711 2.0241935 
+####################
+### avec ggplot
+####################
 
+### Q1 autres méthodes
+ggplot(data=data.frame(FN,FP), aes(x=seuil))+
+  geom_line(aes(y=FN),col="red",lty=2)+
+  geom_line(aes(y=FP),col="orange",lty=3)+
+  geom_line(aes(y=FP+FN),col="black",lty=1)+
+  geom_point(aes(x=seuil[wm], y=me),col="red")
 
-confint(res.glm)
-# avec confint lesintervalles de confiance des composantes du paramètre
-# sont calculés à partir de la vraisemblance profilée
-# d'où la légère différence de résultat 
-#  (Intercept) -4.7369172 -2.485148
-#  ghq          0.9406541  2.124828
+# si on veut une légende, c'est plus compliqué... il faut faire un df spécifique
+# on peut aussi utiliser la fonction melt
+tcforggplot = data.frame(seuil=rep(seuil,3), 
+                         err = c(FN,FP,FN+FP),
+                         type= rep(c("FN","FP","FN+FP"),rep(length(seuil),3)) )
+ggplot(data=tcforggplot, aes(x=seuil, y=err, color=type, linetype=type))+ 
+  geom_line()+
+  scale_color_manual(name = "erreur",
+                     values = c("red","black","orange"),
+                     labels = c("faux neg", "total", "faux pos"))+
+  scale_linetype_manual(name = "erreur",
+                        values = c(2,1,3),
+                        labels = c("faux neg", "total", "faux pos"))+
+  geom_point(aes(x=seuil[wm], y=me),col="red")+
+  theme(legend.position="top")
 
-
-###################
-### 5- IC de l'espérance de la réponse
-###################
-## cas ghq=0: on prend simplement la fonction de lien inverse des bornes de l'IC calculé à Q4
-# delta méthode inutile ici car cas d'une fonction strictement monotone
-
-1/(1+exp(-ICint))
-
-# Rem:  fonction inverse est déjà codée! 
-binomial()$linkinv(eta=ICint) 
-
-## pour ghq = 1:5, 
-# étape 1 : on calcule l'IC du régresseur linéaire
-alpha = 0.05; q = qnorm(1-alpha/2)
-
-# à la main
-A = cbind(rep(1,5),1:5)
-c = res.glm$coef
-est = A%*%c
-vest = diag(A%*%vcov(res.glm)%*%t(A))
-s.est = sqrt(vest)
-# 0.3780032 0.3821204 0.5715661 0.8275880 1.1048341
-
-ICxtheta = data.frame (est=est, min=est-q*s.est, max=est+q*s.est)
-#      est        min        max
-#1 -2.0133413 -2.7542140 -1.2724687
-#2 -0.5731090 -1.3220512  0.1758331
-#3  0.8671233 -0.2531257  1.9873723
-#4  2.3073556  0.6853128  3.9293983
-#5  3.7475879  1.5821528  5.9130229
-
-# étape 2: et on prend la fonction de lien inverse pour ramener dans l'échelle de la probabilité
-pred = 1/(1+exp(- ICxtheta)) 
-#       est       min       max
-#1 0.1178093 0.0598491 0.2188350
-#2 0.3605197 0.2104772 0.5438454
-#3 0.7041468 0.4370543 0.8794649
-#4 0.9094844 0.6649234 0.9807234
-#5 0.9769684 0.8295092 0.9973033
-
-
-# la représentation graphique avec ggplot
-# la commande suivante ne fonctionne, pas, à cause de data=df dans ggplot
-plt + geom_segment(aes(x=1:5, y=pred$min, xend=1:5, yend=pred$max),
-                   col="purple",lty=2)
-
-# alternative 1 = ne pas mettre data dans ggplot
-ggplot()+ 
-  geom_point(aes(x=df$ghq, y=df$prop, col=df$sex, pch=df$sex), size=3)+
-  stat_smooth(method="lm",se=TRUE)+
-  stat_function(fun=function(x)f(x,a=res.glm$coef[1],b= res.glm$coef[2]),
-                col="red", lwd=1, lty=2)+
-  geom_segment(aes(x=1:5, y=pred$min, xend=1:5, yend=pred$max),col="purple")
-
-# alternative 2 voir plus loin
-
-###################
-### 6- avec la commande predict
-###################
-pred.link = predict(res.glm,newdata=data.frame(ghq=1:5),type="link", se.fit=TRUE)
-cbind(s.est, pred.link$se.fit)   # idem !                                 # std err du régresseur linéaire
-data.frame(min = 1/(1+exp(-pred.link$fit+q*pred.link$se.fit)), 
-           max = 1/(1+exp(-pred.link$fit-q*pred.link$se.fit)) )  # idem
-
-# predict permet aussi d'exprimer dans l'échelle de la proba
-pred.prob = predict(res.glm,newdata=data.frame(ghq=1:5),type="response", se.fit=TRUE) # std err de la delta méthode
-
-cbind(pred.prob$fit, pred$est)  # OK pour l'estimation ponctuelle
-cbind(pred.prob$se.fit, s.est *pred.prob$fit*(1-pred.prob$fit)) # OK pour std err par delta methode
-
-# et alternative 2 pour la visu: on fait un nouveau df
-# pred contient déjà l'IC des prédictions faites en utilisant la fonction de lien inverse sur les bornes
-pred$ghq = 1:5
-
-# on peut comparer avec la méthode delta 
-pred$minDelta= pred.prob$fit-q* pred.prob$se.fit
-pred$maxDelta= pred.prob$fit+q* pred.prob$se.fit
-plt + 
-   geom_segment(data=pred,aes(x=ghq, y=max, xend=ghq, yend=min),col="red",lwd=1) +
-   geom_segment(data=pred,aes(x=ghq, y=maxDelta, xend=ghq, yend=minDelta),col="black",lty=2,lwd=1.1)+
-   stat_smooth(data=df,method="glm",se=TRUE, method.args = list(family=binomial())) 
-
-# la visu des IC n'est pas bonne...
-# et d'ailleurs, il y a un pb avec stat_smooth
-# Warning message:
-#    In eval(family$initialize) : non-integer #successes in a binomial glm!
-
-# c'est parce que  stat_smooth ne fait pas le glm qu'on croit...
-# stat_smooth fait la régression suivante
-# (il considère 17 observations individuelles au lieu de sum_k n_k=120 en tout)
-# donc un rapport de std error de l'ordre de sqrt(120/17) = 2.65
-
-res.glm2 = glm(prop~ghq, family=binomial,data=df)
-summary(res.glm2)
-#             Estimate Std. Error z value Pr(>|z|)  
-# (Intercept)  -3.4757     2.0117  -1.728   0.0840 . # std err bcp plus grande donc IC + larges
-# ghq           1.4668     0.7742   1.895   0.0581 .
-
-summary(res.glm)
-#              Estimate Std. Error z value Pr(>|z|)    
-# (Intercept)  -3.4536     0.5633  -6.131 8.73e-10 ***
-# ghq           1.4402     0.2979   4.834 1.34e-06 ***
-   
-# on peut arranger cela en mettant un poids sur les observations
-res.glm3 = glm(prop~ghq, family=binomial,weights=tot,data=df)
-summary(res.glm3)   # idem res.glm
-
-# les bons ICs
-plt + 
-   geom_segment(data=pred,aes(x=ghq, y=max, xend=ghq, yend=min),color="red",lwd=1) +
-   geom_segment(data=pred,aes(x=ghq, y=maxDelta, xend=ghq, yend=minDelta),color="black",lty=2,lwd=1.1)+
-   stat_smooth(data=df,aes(x=ghq,y=prop, weight=tot),method="glm",se=TRUE, 
-               method.args = list(family=binomial()),fill="blue" )
-
-
-########################### pour les curieu.ses
-# alternative 3 
-# on crée un fonction qui calcule le min
-fICm = function(x){
-   est = c(1,x)%*% res.glm$coef 
-   s.est = sqrt(diag(c(1,x)%*%vcov(res.glm)%*%c(1,x)))
-   min=est-q*s.est
-   1/(1+exp(-min))
-} 
-# donc il faut vectoriser l'argument pour l'appel dans segments
-FICm= Vectorize(fICm)
-FICm(1:5)
-
-# idem pour borne sup
-fICM = function(x){
-   1/(1+exp(- c(1,x)%*% res.glm$coef -q*sqrt(diag(c(1,x)%*%vcov(res.glm)%*%c(1,x)))  ))
-} 
-FICM= Vectorize(fICM)
-FICM(1:5)
-df$min=FICm(df$ghq)
-df$max=FICM(df$ghq)
-
-plt = plt +   geom_segment(aes(x=ghq, y=FICm(ghq),xend=ghq, yend=FICM(ghq)),col="violet")
-
-# et tant qu'à faire, les courbes d'IC
-plt = plt +
-   stat_function(fun=FICm, col="violet",  lty=2)+
-   stat_function(fun=FICM, col="violet",  lty=2)
-
-# et un remplissage
-plt + geom_ribbon(aes(ymin=FICm(ghq), ymax=FICM(ghq)),fill="lightblue", alpha=0.7) 
-
-
-###### avec plot
-# lin
-col = as.numeric(factor(df$sex))
-
-plot(df$ghq,df$prop,main="données GHQ",xlab="score ghq", ylab="proportion de cas",
-     col=col,pch=col)
-abline(res.lm)   # ajustement linéaire
-
-# logistique
-plot(df$ghq,df$prop,main="données GHQ",xlab="score ghq", ylab="proportion de cas")
-abline(res.lm) 
-curve(f(x,res.glm$coef[1], res.glm$coef[2]),from=0, to=10,col=2,add=TRUE)
-legend("bottomright", c("observations","lm","glm"),
-       col=c(1,1,2),lty=0:2,pch=c(1,-1,-1))
-
-#IC
-plot(df$ghq,df$prop,main="données GHQ")
-curve(predict(res.glm,newdata=data.frame(ghq=x),type="response"),lty=2,col=2,add=TRUE,
-      from=0, to=10)
-segments(1:5,pred$min,1:5,pred$max,col=2) 
-segments(1:5, pred.prob$fit-q* pred.prob$se.fit, 
-         1:5, pred.prob$fit+q* pred.prob$se.fit ,col="black", lty=2,lwd=2)
-legend("bottomright", c("observation","prediction", "IC", "IC par delta"),
-       col=c("black","red","red","black"),lty=c(0,2,1,2),pch=c(1,-1,-1,-1),cex=0.7)
+### Q2 alternatives
+# se créer le df qui va bien
+df = data.frame( FPR = c(unlist(ROC@x.values),unlist(ROC2@x.values),
+                         unlist(ROC.lda@x.values),unlist(ROC.qda@x.values),
+                         unlist(ROC@x.values)),
+                 TPR = c(unlist(ROC@y.values),unlist(ROC2@y.values),
+                         unlist(ROC.lda@y.values),unlist(ROC.qda@y.values),
+                         unlist(ROC@x.values)),
+                type = factor(rep(1:5,c(length(unlist(ROC@y.values)),
+                                 length(unlist(ROC2@x.values)), 
+                                 length(unlist(ROC.lda@y.values)),
+                                 length(unlist(ROC.qda@y.values)),
+                                 length(unlist(ROC@y.values)))))
+)
+ggplot(df,aes(FPR,TPR,color=type,linetype=type))+geom_line()+
+  labs(title= "ROC curve", 
+       x = "False Positive Rate (1-Specificity)", 
+       y = "True Positive Rate (Sensitivity)" )+
+  scale_color_manual(name = "",values=1:5,labels=c("M", "M2", "lda","qda","aléa"))+
+  scale_linetype_manual(name = "",values=1:5,labels=c("M", "M2", "lda","qda","aléa"))
