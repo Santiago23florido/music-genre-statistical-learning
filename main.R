@@ -160,10 +160,10 @@ seeds = seeds[, !names(seeds) %in% c("PAR_ASE_M", "PAR_ASE_MV", "PAR_SFM_M", "PA
 
 p = ncol(seeds)
 
+
+#Question 2
 res = PCA(seeds[,-p], graph=FALSE)
-
-
-#Proper values studies
+#Proper values study
 
 round(res$eig,4) # variance of each axe
 sum(res$eig[,1])
@@ -177,7 +177,28 @@ inertie_percentage = ggplot() + aes(x=1:length(res$eig[,2]), y=res$eig[,2]) + ge
 ggsave("output/part1/inertie_percentage.png", inertie_percentage)
 
 
-#Correlation of variables studies
+#Correlation of variables study
 V = res$var
-plot(res,choix="var") 
+#Quality of representation
+V$cos2
 
+#Projection of individual data over the first plane
+pca_ind = data.frame(
+  Dim1 = res$ind$coord[,1],
+  Dim2 = res$ind$coord[,2],
+  GENRE = seeds[,p]
+)
+
+pca_plane_plot = ggplot(pca_ind) +
+  aes(x=Dim1, y=Dim2, color=GENRE) +
+  geom_point(alpha=0.7) +
+  xlab("Dim.1") +
+  ylab("Dim.2") +
+  ggtitle("Individuals projected onto the first principal plane")
+
+ggsave("output/part1/pca_first_plane.png", pca_plane_plot)
+
+
+#Candidates to select 6 10 12 34
+
+#which(res$eig[,2] > 100 / p)
