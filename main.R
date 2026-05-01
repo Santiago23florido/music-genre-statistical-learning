@@ -248,7 +248,7 @@ for (mode in c("not_normalized", "normalized")) {
     height_count = min(15, length(hc$height))
     height_profile = rev(hc$height)[1:height_count]
     
-    #Select k by maximizing the average silhouette width indice de silhouette (Rousseeuw et al. 1987)
+    #Select k by maximizing the average silhouette width indice de silhouette based on (Rousseeuw et al. 1987) LLM suggested implementation of the function
     k_candidates = 2:min(10, nrow(X_acp) - 1)
     mean_silhouette_by_k = sapply(k_candidates, function(k){
       grp_k = cutree(hc, k=k)
@@ -312,3 +312,16 @@ for (mode in c("not_normalized", "normalized")) {
 
 set.seed(103)
 train = sample(c(TRUE, FALSE), n, replace=TRUE, prob=c(2/3, 1/3))
+
+
+#################
+# PART II
+#################
+
+#Restrict to Classical and Jazz for binary classification
+binary_genres = c("Classical", "Jazz")
+binary_train = seeds[train & seeds[,p] %in% binary_genres, ]
+binary_test = seeds[!train & seeds[,p] %in% binary_genres, ]
+
+#Check the requested sample sizes
+c(nrow(binary_train), nrow(binary_test))
