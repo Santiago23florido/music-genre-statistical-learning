@@ -4,10 +4,12 @@
 library(ggplot2)
 library(FactoMineR)
 library(factoextra)
+library(cluster)
 
 rm(list=objects())
 graphics.off(); seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
 dir.create("output/part1", recursive=TRUE, showWarnings=FALSE)
+dir.create("output/part1/hclust_pca", recursive=TRUE, showWarnings=FALSE)
 #################
 # PART I
 #################
@@ -223,4 +225,84 @@ for (k in c(4, 6, 10, 34)) {
 ####
 #Question 3
 ####
+
+genre = as.integer(as.factor(seeds[,p]))
+k_grp = nlevels(as.factor(seeds[,p]))
+
+#Hclust estimation for all ACP resultant candidates 4 6 10 34
+dir.create("output/part1/hclust_pca/not_normalized", recursive=TRUE, showWarnings=FALSE)
+dir.create("output/part1/hclust_pca/normalized", recursive=TRUE, showWarnings=FALSE)
+
+#Hclust estimation for all ACP resultant candidates 4 6 10 34
+for (mode in c("not_normalized", "normalized")) {
+  for (d in c(4, 6, 10, 34)) {
+    X_acp = res$ind$coord[, 1:d, drop=FALSE]
+    if (mode == "normalized") {
+      X_acp = scale(X_acp, center=TRUE, scale=TRUE)
+    }
+    dd = dist(X_acp)
+    
+    hc = hclust(dd, method="ward.D2")
+    
+    #Plot the first heights 
+    height_count = min(15, length(hc$height))
+    height_profile = rev(hc$height)[1:height_count]
+    
+    #Select k by maximizing the average silhouette width indice de silhouette (Rousseeuw et al. 1987)
+    k_candidates = 2:min(10, nrow(X_acp) - 1)
+    mean_silhouette_by_k = sapply(k_candidates, function(k){
+      grp_k = cutree(hc, k=k)
+      mean(silhouette(grp_k, dd)[,3])
+    })
+    k_selected = k_candidates[which.max(mean_silhouette_by_k)]
+    h_selected = rev(hc$height)[k_selected]
+    
+    grp = cutree(hc, k=k_selected)
+    
+    sil_ward = silhouette(grp, dd)
+    sil_genre = silhouette(genre, dd)
+    
+    ward_mean = mean(sil_ward[,3])
+    genre_mean = mean(sil_genre[,3])
+    
+    #Plot the first heights to support the choice of k
+    png(sprintf("output/part1/hclust_pca/%s/heights_pca_%02d_components.png", mode, d), width=1200, height=700, res=150)
+    barplot(height_profile, main=sprintf("Height diagram for Ward clustering on first %d PCs (%s)", d, mode))
+    abline(h=h_selected, lty=2, col="red")
+    dev.off()
+    
+    #Plot the mean silhouette criterion used to choose k
+    png(sprintf("output/part1/hclust_pca/%s/mean_silhouette_pca_%02d_components.png", mode, d), width=1200, height=700, res=150)
+    bar_mid = barplot(mean_silhouette_by_k, names.arg=k_candidates,
+                      main=sprintf("Average silhouette width by k on first %d PCs (%s)", d, mode),
+                      xlab="Number of clusters k", ylab="Average silhouette width")
+    abline(v=bar_mid[which.max(mean_silhouette_by_k)], lty=2, col="red")
+    dev.off()
+    
+    png(sprintf("output/part1/hclust_pca/%s/dendrogram_pca_%02d_components.png", mode, d), width=1200, height=700, res=150)
+    plot(hc, cex=0.5, main=sprintf("Ward dendrogram on first %d PCs (%s)", d, mode))
+    abline(h=h_selected, lty=2, col="red")
+    rect.hclust(hc, k=k_selected, border=2:(k_selected+1))
+    dev.off()
+    
+    #Build silhouettes for Ward clustering and true genre labels
+    plt_sil_ward = fviz_silhouette(sil_ward) +
+      ggtitle(sprintf("Ward silhouette on first %d PCs", d),
+              subtitle=sprintf("%s | selected k = %d | mean = %.3f", mode, k_selected, ward_mean))
+    plt_sil_genre = fviz_silhouette(sil_genre) +
+      ggtitle(sprintf("GENRE silhouette on first %d PCs", d),
+              subtitle=sprintf("%s | k = %d | mean = %.3f", mode, k_grp, genre_mean))
+    plt_sil = cowplot::plot_grid(plt_sil_ward, plt_sil_genre, ncol=2, nrow=1)
+    ggsave(sprintf("output/part1/hclust_pca/%s/silhouette_pca_%02d_components.png", mode, d), plt_sil, width=14, height=6)
+    
+    cat(
+      mode,
+      " | PCA dimensions =", d,
+      " | selected k =", k_selected,
+      " | mean Ward silhouette =", ward_mean,
+      " | mean GENRE silhouette =", genre_mean,
+      "\n"
+    )
+  }
+}
 
