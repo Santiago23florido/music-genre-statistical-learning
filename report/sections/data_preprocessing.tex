@@ -1,18 +1,1 @@
 \section{Data Description and Preprocessing}
-\subsection{Dataset Description}
-The main dataset contains 7,773 labeled tracks and 192 columns in total: 191 acoustic descriptors and the response variable \texttt{GENRE}. The five genres represented in the study are Blues (1,074 tracks), Classical (2,318), Jazz (2,036), Pop (1,033), and Rock (1,312). The companion holdout file contains 3,798 additional tracks with the same 191 predictors and no genre label.
-
-\subsection{Feature Engineering}
-The files in \texttt{data/} are semicolon-separated and already provide a fully numerical predictor matrix, except for the categorical target \texttt{GENRE} in the training file. The feature names show several descriptor families, including spectral centroid and spread variables, spectral flatness measurements, MFCC coefficients, and threshold, RMS, and zero-crossing descriptors. No missing values are present in either file.
-For the final version of the report, one possible criterion is to screen strictly positive variables for strong right-skewness before considering a logarithmic transformation, and then compare the effect of subsequent centering or autoscaling, following the preprocessing discussion of van den Berg et al.~\cite{vandenberg2006preprocessing}. This choice should nevertheless be justified empirically for the variables considered, since Feng et al.~\cite{feng2014log} emphasize that log-transformation should be used cautiously and is most naturally motivated when the original variable is approximately log-normal.
-% Useful reference points for discussing log-transformation in the final report:
-% van den Berg et al. (2006), Background: clean data are obtained first, then pretreatment is applied before data analysis.
-% van den Berg et al. (2006), Class III: Transformations: log/power transformations are used to correct heteroscedasticity,
-% convert multiplicative relations into additive relations, and make skewed distributions more symmetric.
-% van den Berg et al. (2006), Class III: Transformations: the pseudo-scaling effect of a transformation is usually not sufficient,
-% so it can be useful to apply a scaling method after the transformation.
-% Feng et al. (2014), Summary and Section 2.1: log-transformation should be used cautiously and is most naturally justified
-% when the original variable is approximately log-normal.
-
-\subsection{Train-Test Split}
-The project data already defines an operational split: \texttt{Music\_2026.txt} is the labeled sample used for exploration and model fitting, while \texttt{Music\_test\_2026.txt} is the unlabeled holdout sample used for final prediction.
