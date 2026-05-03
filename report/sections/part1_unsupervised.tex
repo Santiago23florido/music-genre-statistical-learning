@@ -39,3 +39,42 @@ The first two principal planes are displayed jointly in Fig.~\ref{fig:pca_princi
 \caption{Composite representation of the two principal planes used in the unsupervised analysis.}
 \label{fig:pca_principal_planes}
 \end{figure}
+
+\subsection{Hierarchical Clustering and Silhouettes}
+
+For the implementation of the unsupervised classifier, Ward's hierarchical clustering is applied to the PCA scores. Several reduced representations are considered by retaining \(d \in \{4,6,10,34\}\) principal components. The choice \(d=4\) corresponds to the first two principal planes. The values \(d=6\) and \(d=10\) are included because the scree plot of the percentage of inertia explained by each component shows relevant breaks before regions where the marginal gains in inertia become more homogeneous. Finally, \(d=34\) is considered because it corresponds to the set of principal components whose individual contribution remains above the average contribution expected under a uniform distribution of inertia across the variables.
+For each retained dimension \(d\), the number of clusters \(k\) is then chosen by maximizing the average silhouette width over \(k \in \{2,\dots,10\}\); the silhouette criterion is recalled in Appendix~\ref{app:skewness}, Subsection~\ref{subsec:silhouette}, Eq.~\eqref{eq:silhouette}. In addition, the effect of unsupervised classification methods is also evaluated in the PCA-derived spaces after normalizing the retained principal component scores before applying hierarchical clustering. This complementary strategy makes it possible to assess whether differences in the scale of the selected PCA coordinates affect the resulting partitions.
+
+\begin{table}[!t]
+\centering
+\caption{Average silhouette widths for Ward clustering and for the true genre partition.}
+\label{tab:ward_genre_silhouettes}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Mode & PCs & Selected \(k\) & Ward silhouette & Genre silhouette \\
+\midrule
+Not normalized & 4  & 3 & 0.2170 & 0.0725 \\
+Not normalized & 6  & 3 & 0.2029 & 0.0739 \\
+Not normalized & 10 & 2 & 0.1644 & 0.0769 \\
+Not normalized & 34 & 2 & 0.1212 & 0.0563 \\
+Normalized     & 4  & 3 & 0.1943 & 0.0604 \\
+Normalized     & 6  & 3 & 0.1283 & 0.0574 \\
+Normalized     & 10 & 5 & 0.0902 & 0.0532 \\
+Normalized     & 34 & 3 & 0.8171 & -0.0062 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The corresponding results are summarized in Table~\ref{tab:ward_genre_silhouettes}. For most dimensions, the Ward partition achieves only moderate average silhouette widths, while the silhouette values induced by the true genre labels remain low, which confirms that the five genres are only weakly separated in these reduced Euclidean representations.
+
+The results make it clear that the partition of the true musical genres in the spaces constructed from the retained PCA variables is weak. The genre-wise silhouette values are low for both normalized and non-normalized representations, even reaching negative average values in the normalized case with \(d=34\). This indicates that the musical genres do not form compact or easily separable groups in the Euclidean spaces and geometries considered. Moreover, this behavior is not homogeneous across genres: although overlap is present for all genres, it is more pronounced for some of them. Therefore, the results obtained with hierarchical clustering not only fail to reproduce the true genre labels, but also reveal that the unsupervised structure preferred by the dataset is different from the five-genre partition. Using the implemented criterion for selecting the number of clusters, the preferred solution is almost always \(k=2\) or \(k=3\). The only case in which \(k=5\) is selected occurs for the normalized representation with \(d=10\), but the corresponding mean silhouette remains very low, with a value of \(0.0902\). Even for the preferred unsupervised partitions, the Ward silhouettes remain weak, which indicates the presence of some structure, but with relatively poor separation between groups.
+
+It is also important to note that, except for the normalized case with \(d=34\), the obtained partitions are not degenerate. In that exceptional case, the clustering produces one very large cluster containing \(7{,}766\) observations and two extremely small clusters of sizes \(3\) and \(4\), which suggests that the corresponding partition is not meaningful for interpretation. In general, normalization tends to reduce the average silhouette obtained by the unsupervised method when compared with the non-normalized PCA representations. This effect may be associated with the fact that normalization assigns equivalent weight to axes that do not contain the same amount of data variability. Since the first principal components are precisely those that concentrate the dominant structure, reweighting all retained axes equally can alter the distances between observations and increase the overlap between the hierarchical structures identified by the clustering algorithm. Overall, it can be concluded that the dataset does contain multivariate structure. However, this structure appears to be organized into a small number of broad and not fully separated groups, rather than into five well-defined clusters aligned with the musical genres.
+
+\subsection{Train Test split}
+
+The project includes an unlabeled holdout file. However, the project statement also requires an internal train--test split within the labeled sample. Therefore, the prescribed random split is applied, assigning observations to the training set with probability \(2/3\) and to the test set with probability \(1/3\), using \texttt{set.seed(103)} for reproducibility.
+
+The binary \textit{Classical} versus \textit{Jazz} subsets derived from this split are used in Section~IV.
