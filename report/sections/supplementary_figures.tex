@@ -1,0 +1,118 @@
+\clearpage
+\section{Supplementary Diagnostics}
+\label{app:skewness}
+This appendix gathers additional descriptive material used in the preprocessing discussion.
+
+\subsection{Mean-to-Median Ratio}
+\label{subsec:mean_ratio}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\columnwidth]{../output/part1/log_candidates_mean_median_ratio.png}
+\caption{Mean-to-median ratio for the positive variables considered as candidates for a logarithmic transformation. Larger values indicate stronger right-skewness.}
+\label{fig:mean_ratio}
+\end{figure}
+
+\subsection{Skewness}
+\label{subsec:skewness}
+The skewness coefficient used in the report follows the standardized third central moment given by NIST/SEMATECH~\cite{nistskewness}:
+\begin{equation}
+g_{1}=\frac{\frac{1}{N}\sum_{i=1}^{N}(Y_{i}-\bar{Y})^{3}}{s^{3}},
+\label{eq:skewness}
+\end{equation}
+where \(\bar{Y}\) is the sample mean and \(s\) is the sample standard deviation. Positive values indicate right-skewness, negative values indicate left-skewness, and values close to zero correspond to more symmetric distributions.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\columnwidth]{../output/part1/log_candidates_skewness.png}
+\caption{Sample skewness for the variables considered as candidates for a logarithmic transformation. Larger positive values indicate stronger right-skewness.}
+\label{fig:skewness_candidates}
+\end{figure}
+
+\subsection{Heteroscedasticity}
+\label{subsec:heteroscedasticity}
+Heteroscedasticity is important in the present analysis because, even when a variable is strongly right-skewed, a logarithmic transformation is especially relevant when the dispersion also tends to increase with the level of the measurements. Van den Berg et al.~\cite{vandenberg2006preprocessing} note that logarithmic transformations are used in part to stabilize spread, while the NIST/SEMATECH \emph{spread-location} diagnostic emphasizes the practical importance of examining how variability changes with location \cite{nistspreadlocation}. Following this idea, the implemented score is a descriptive screening tool: each strictly positive variable is partitioned into \(K=10\) empirical-quantile groups, the group means \(\bar{X}_g\) and group standard deviations \(s_g\) are computed, and the monotone association between level and spread is summarized by Spearman's rank correlation \cite{nistrankcorrelation},
+\begin{equation}
+H(X)=\rho_S\!\left((\bar{X}_g)_{g \in \mathcal{G}},(s_g)_{g \in \mathcal{G}}\right),
+\label{eq:heteroscedasticity_score_app}
+\end{equation}
+where \(\rho_S\) is Spearman's coefficient and \(\mathcal{G}\) denotes the set of groups for which both summaries are finite. Large positive values of \(H(X)\) indicate a clear \emph{spread-versus-level} pattern, meaning that higher average values are associated with higher within-group dispersion; for that reason, this score is used together with the mean-to-median ratio and skewness to identify plausible candidates for a logarithmic transformation. The corresponding ranking of variables is shown in Fig.~\ref{fig:heteroscedasticity_candidates}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\columnwidth]{../output/part1/log_candidates_heteroscedasticity.png}
+\caption{Heteroscedasticity score for the positive variables considered as candidates for a logarithmic transformation. Larger positive values indicate a stronger spread-versus-level pattern.}
+\label{fig:heteroscedasticity_candidates}
+\end{figure}
+
+\subsection{Log-Normality}
+\label{subsec:log_normality}
+For the variables retained simultaneously by the asymmetry and heteroscedasticity screens, we finally examine whether the logarithmic transformation produces a distribution closer to normality. The set of common candidate variables is listed in Table~\ref{tab:common_candidates}. We then apply the Shapiro--Wilk test to \(\log(X)\) and rank these variables by the resulting \(W\) statistic, where values closer to \(1\) indicate a better agreement with normality. In basic terms, the \texttt{variable} column gives the name of the candidate predictor, \texttt{shapiro\_w} is the Shapiro--Wilk statistic computed on \(\log(X)\), and \texttt{p\_value} is the corresponding significance level for the null hypothesis that \(\log(X)\) is normally distributed. The values reported in Table~\ref{tab:log_normality_candidates} are obtained by applying the test to each positive variable that was retained by the previous screening criteria.
+
+\begin{table}[H]
+\centering
+\caption{Variables retained simultaneously by the asymmetry and heteroscedasticity screening criteria.}
+\label{tab:common_candidates}
+\scriptsize
+\begin{tabular}{rl}
+\toprule
+\# & Variable \\
+\midrule
+1 & PAR\_PEAK\_RMS10FR\_VAR \\
+2 & PAR\_SFMV24 \\
+3 & PAR\_SC\_V \\
+4 & PAR\_ZCD\_10FR\_VAR \\
+5 & PAR\_THR\_1RMS\_10FR\_VAR \\
+6 & PAR\_ASEV33 \\
+7 & PAR\_THR\_2RMS\_10FR\_VAR \\
+8 & PAR\_ASEV1 \\
+9 & PAR\_ASC\_V \\
+10 & PAR\_ASEV2 \\
+11 & PAR\_ASEV3 \\
+12 & PAR\_ASEV4 \\
+13 & PAR\_ASEV5 \\
+14 & PAR\_ASEV6 \\
+15 & PAR\_ASEV7 \\
+16 & PAR\_ASEV8 \\
+17 & PAR\_ASEV30 \\
+18 & PAR\_ASEV26 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\columnwidth]{../output/part1/common_candidates_log_normality.png}
+\caption{Shapiro--Wilk \(W\) statistic computed on \(\log(X)\) for the common candidate variables. Larger values indicate that the log-transformed variable is closer to a normal distribution.}
+\label{fig:log_normality_candidates}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Shapiro--Wilk results on \(\log(X)\) for the common candidate variables.}
+\label{tab:log_normality_candidates}
+\scriptsize
+\begin{tabular}{lll}
+\toprule
+Variable & \(\boldsymbol{W}\) & \(\boldsymbol{p}\)-value \\
+\midrule
+PAR\_SC\_V & 0.9984029 & \(6.06 \times 10^{-5}\) \\
+PAR\_THR\_2RMS\_10FR\_VAR & 0.9977017 & \(7.98 \times 10^{-7}\) \\
+PAR\_ZCD\_10FR\_VAR & 0.9969759 & \(1.70 \times 10^{-8}\) \\
+PAR\_ASEV26 & 0.9961615 & \(4.01 \times 10^{-10}\) \\
+PAR\_THR\_1RMS\_10FR\_VAR & 0.9922652 & \(7.13 \times 10^{-16}\) \\
+PAR\_ASC\_V & 0.9922296 & \(6.47 \times 10^{-16}\) \\
+PAR\_ASEV8 & 0.9916860 & \(1.51 \times 10^{-16}\) \\
+PAR\_ASEV30 & 0.9913730 & \(6.72 \times 10^{-17}\) \\
+PAR\_ASEV7 & 0.9888169 & \(1.77 \times 10^{-19}\) \\
+PAR\_ASEV6 & 0.9853344 & \(2.19 \times 10^{-22}\) \\
+PAR\_ASEV5 & 0.9790100 & \(1.45 \times 10^{-26}\) \\
+PAR\_ASEV4 & 0.9746038 & \(6.10 \times 10^{-29}\) \\
+PAR\_ASEV3 & 0.9737920 & \(2.41 \times 10^{-29}\) \\
+PAR\_ASEV1 & 0.9698754 & \(3.67 \times 10^{-31}\) \\
+PAR\_PEAK\_RMS10FR\_VAR & 0.9688232 & \(1.28 \times 10^{-31}\) \\
+PAR\_ASEV33 & 0.9510785 & \(6.11 \times 10^{-38}\) \\
+PAR\_ASEV2 & 0.9469831 & \(3.93 \times 10^{-39}\) \\
+PAR\_SFMV24 & 0.9436739 & \(4.84 \times 10^{-40}\) \\
+\bottomrule
+\end{tabular}
+\end{table}
