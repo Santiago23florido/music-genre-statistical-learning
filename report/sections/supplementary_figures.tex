@@ -383,3 +383,124 @@ The following figures display the silhouette plots obtained for Ward clustering 
 \caption{Silhouette plots for the normalized PCA scores with \(d=34\) retained components.}
 \label{fig:silhouette_normalized_34}
 \end{figure}
+
+\subsection{Coefficient Significance in Logistic Regression}
+\label{subsec:logistic_significance}
+In the binary logistic models of Part II, the significance of each predictor is assessed through the Wald test for an individual regression coefficient \cite{psulogisticwald,rsummaryglm}. If \(\pi(x)=\mathbb{P}(Y=1\mid X=x)\), the fitted model is
+\begin{equation}
+\log\!\left(\frac{\pi(x)}{1-\pi(x)}\right)=\beta_0+\sum_{j=1}^{p}\beta_j x_j.
+\label{eq:logistic_model}
+\end{equation}
+For each predictor \(x_j\), the implemented null hypothesis is
+\begin{equation}
+H_0:\beta_j=0.
+\label{eq:wald_null}
+\end{equation}
+Under the large-sample normal approximation for the maximum likelihood estimator,
+\begin{equation}
+Z_j=\frac{\widehat{\beta}_j}{\mathrm{SE}(\widehat{\beta}_j)} \approx \mathcal{N}(0,1)
+\qquad \text{under } H_0,
+\label{eq:wald_z}
+\end{equation}
+or equivalently
+\begin{equation}
+W_j=Z_j^2=\frac{\widehat{\beta}_j^2}{\mathrm{SE}(\widehat{\beta}_j)^2}\approx \chi^2_1.
+\label{eq:wald_chi2}
+\end{equation}
+Hence the column \texttt{Pr(>|z|)} returned by \texttt{summary(glm(...))} is the two-sided p-value
+\begin{equation}
+p_j=2\,\mathbb{P}(Z\geq |Z_j|)=2\left[1-\Phi(|Z_j|)\right],
+\qquad Z\sim \mathcal{N}(0,1).
+\label{eq:wald_pvalue}
+\end{equation}
+In the present implementation, the reduced model \texttt{Mod1} retains the variables such that \(p_j<0.05\), whereas \texttt{Mod2} retains the variables such that \(p_j<0.20\).
+
+\subsection{Stepwise AIC Selection}
+\label{subsec:step_aic}
+The model \texttt{ModAIC} of Part II is obtained from the full logistic model \texttt{ModT} by applying \texttt{stepAIC(ModT)} from the \texttt{MASS} package \cite{stepaicmass,raicdoc}. The criterion minimized along the search is Akaike's Information Criterion,
+\begin{equation}
+\mathrm{AIC}=-2\,\ell(\widehat{\beta})+k\,q,
+\label{eq:aic}
+\end{equation}
+where \(\ell(\widehat{\beta})\) is the maximized log-likelihood of the candidate model, \(q\) is the number of estimated parameters, and \(k=2\) for the classical AIC. Since the code uses \texttt{stepAIC(ModT)} with default arguments, the search starts from the full logistic model and removes terms step by step whenever this decreases the AIC. At each step, among the admissible one-term deletions, the selected move is the one that gives the smallest AIC, and the procedure stops when no further deletion improves the criterion. Formally, if \(\mathcal{M}_0\) is the current model and \(\mathcal{N}(\mathcal{M}_0)\) is the set of candidate one-step submodels explored by the algorithm, the update rule can be summarized as
+\begin{equation}
+\mathcal{M}_{t+1}=\arg\min_{\mathcal{M}\in\mathcal{N}(\mathcal{M}_t)} \mathrm{AIC}(\mathcal{M}),
+\label{eq:stepaic_update}
+\end{equation}
+provided that this minimum is strictly smaller than \(\mathrm{AIC}(\mathcal{M}_t)\). The resulting model therefore balances fit and parsimony through the AIC penalty rather than through coefficient-wise significance thresholds.
+
+\subsection{Ridge Regularization}
+\label{subsec:ridge_regularization}
+Following the regularization framework presented in \cite{keribin2025supervised}, the motivation for ridge regression can first be introduced from the classical linear regression setting. In ordinary least squares, the objective is to minimize the residual sum of squares:
+\begin{equation}
+SCR(\theta)
+=
+\sum_{i=1}^{n}
+\left(
+y_i - x_i^\top \theta
+\right)^2 .
+\label{eq:ols_scr}
+\end{equation}
+As shown in Equation~\eqref{eq:ols_scr}, the estimator seeks the coefficient vector \(\theta\) that best fits the training data. However, when the number of predictors increases, the model becomes more flexible. This can reduce bias, because the model has greater capacity to adapt to the observed structure, but it can also increase variance, since small perturbations in the training sample may lead to substantially different coefficient estimates.
+
+Ridge regression addresses this issue by replacing the ordinary least-squares criterion with a penalized criterion \cite{keribin2025supervised}:
+\begin{equation}
+SCR(\theta)
++
+\kappa
+\sum_{j=1}^{p}
+\theta_j^2 .
+\label{eq:ridge_penalized_criterion}
+\end{equation}
+
+Equivalently, the ridge estimator is defined as
+\begin{equation}
+\widehat{\theta}_{\mathrm{ridge}}
+=
+\arg\min_{\theta}
+\left[
+\sum_{i=1}^{n}
+\left(
+y_i - x_i^\top \theta
+\right)^2
++
+\kappa
+\sum_{j=1}^{p}
+\theta_j^2
+\right].
+\label{eq:ridge_estimator}
+\end{equation}
+
+In Equations~\eqref{eq:ridge_penalized_criterion} and~\eqref{eq:ridge_estimator}, the term
+\begin{equation}
+\kappa
+\sum_{j=1}^{p}
+\theta_j^2
+\label{eq:ridge_penalty}
+\end{equation}
+penalizes excessively large coefficients. The parameter \(\kappa \geq 0\) controls the strength of the regularization. When \(\kappa = 0\), the non-regularized estimator is recovered. As \(\kappa\) increases, the penalty becomes stronger and the estimated coefficients are progressively shrunk toward zero.
+
+From the perspective of the bias--variance trade-off, ridge regularization introduces additional bias in order to reduce the variance of the estimator. This is particularly relevant in the presence of correlated predictors, because ridge tends to distribute the effect more smoothly among related variables instead of producing unstable coefficient estimates. Therefore, ridge is not primarily used for variable selection, but rather to stabilize the estimation process, control the effective complexity of the model, and improve generalization performance.
+
+In the logistic regression context considered in this project, the same regularization principle is applied by penalizing the negative log-likelihood. If \(\ell(\beta)\) denotes the log-likelihood of the logistic model, the ridge logistic estimator is obtained by solving
+\begin{equation}
+\widehat{\beta}_{\mathrm{ridge}}
+=
+\arg\min_{\beta}
+\left[
+-\ell(\beta)
++
+\kappa
+\sum_{j=1}^{p}
+\beta_j^2
+\right].
+\label{eq:ridge_logistic_estimator}
+\end{equation}
+Thus, Equation~\eqref{eq:ridge_logistic_estimator} extends the ridge principle described in \cite{keribin2025supervised} to the binary classification problem. In this setting, the regularization term reduces the magnitude of the logistic regression coefficients, improves numerical stability, and limits overfitting when the predictor space is high-dimensional.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part2/ridge/ridge_coefficients_loglambda.png}
+\caption{Ridge coefficient paths as functions of \(-\log(\lambda)\). Moving to the right corresponds to weaker penalization and larger coefficient magnitudes.}
+\label{fig:ridge_coefficients_loglambda}
+\end{figure}

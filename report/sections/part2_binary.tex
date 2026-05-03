@@ -1,0 +1,45 @@
+\section{Binary Classification}
+This section focuses on the binary discrimination between \textit{Classical} and \textit{Jazz}, which are the two largest classes in the labeled sample. Restricting the dataset to these two genres yields \(4{,}354\) observations in total. After applying the prescribed split described in Section~II, the training subset contains \(2{,}851\) tracks, including \(1{,}512\) \textit{Classical} tracks and \(1{,}339\) \textit{Jazz} tracks. In the binary response variable, \textit{Jazz} is encoded as the success category.
+\subsection{Logistic regression models}
+Given the nature of the problem, a logistic regression model is proposed in order to classify an observation \(x\), defined in the space of the selected system variables, into the category of interest, which has been fixed as \textit{Jazz}. Therefore, the mathematical formulation used for the model is
+\begin{equation}
+P(Y = 1 \mid X = x) =
+\frac{\exp\left(\beta_0 + x^\top \beta\right)}
+{1 + \exp\left(\beta_0 + x^\top \beta\right)}.
+\label{eq:logistic_model_binary}
+\end{equation}
+
+However, the predictor space has a relatively high dimension, with \(165\) retained predictors. For this reason, several maximum-likelihood logistic regression models are compared, each imposing a different restriction on the number of retained variables. The models are defined as follows:
+\begin{itemize}
+    \item \textbf{Full logistic model:} includes the \(165\) retained predictors.
+    \item \textbf{Significance-based models:} retain only predictors whose coefficients satisfy a predefined significance threshold.
+    \item \textbf{Stepwise logistic model:} selects variables using the \texttt{stepAIC} criterion.
+    \item \textbf{Reduced logistic models:} use a smaller subset of indicators to improve parsimony and interpretability.
+\end{itemize}
+
+This comparison makes it possible to evaluate the effect of variable selection on model complexity, numerical stability, interpretability, and predictive performance.
+
+\subsection{Regularized Logistic Regression}
+
+The interest of ridge regression in this study comes from the combination of a high-dimensional predictor space and residual dependence between acoustic descriptors, even after the preprocessing stage. In such a setting, an unpenalized logistic model may yield unstable coefficient estimates and may overfit the training data. Ridge regularization addresses this issue by shrinking the coefficients toward zero, which improves numerical stability and reduces the variance of the fitted classifier.
+
+More specifically, ridge is useful here because it allows the model to keep the information carried by many correlated predictors without relying on a hard variable-selection rule. Instead of arbitrarily retaining only one variable among several related descriptors, the penalty distributes the effect more smoothly across them. For this reason, ridge is introduced as a way to control effective model complexity and to improve generalization performance in the binary classification task. The corresponding mathematical formulation is recalled in Appendix~\ref{app:skewness}, Subsection~\ref{subsec:ridge_regularization}.
+
+In the \texttt{glmnet} algorithm, two extreme values of the regularization parameter are considered. The first one corresponds to \(\lambda = 10^{10}\), a case in which the penalization term dominates the fitting criterion. As a consequence, the coefficients associated with the predictors are strongly shrunk and approach values close to zero at the end of the training process. The second case corresponds to \(\lambda = 10^{-2}\), where the penalization is weak. In this situation, the fitted model is closer to a non-regularized logistic regression model using all retained predictors. Therefore, this configuration can be interpreted as being conceptually close to the maximum-likelihood logistic model.
+
+Ridge regularization does not produce a single model directly, but rather a complete regularization path, corresponding to the family of fitted models obtained for different values of \(\lambda\). However, from this family of models, it is necessary to select one final specification associated with a particular value of the regularization parameter.
+
+The method proposed for selecting this value of \(\lambda\) is 10-fold cross-validation. The training set is divided into 10 subsamples. Successively, 9 of them are used to fit the ridge model, while the remaining subsample is used to evaluate the prediction error. This procedure is repeated until each fold has been used once as the validation sample.
+
+For each value of \(\lambda\) in the grid, the prediction errors obtained over the 10 folds are averaged. The final retained value is \texttt{lambda.min}, that is, the value of \(\lambda\) that minimizes the mean cross-validation error. This leads to the final regularized model used for the binary classification task.
+
+From the cross-validation results, displayed in Fig.~\ref{fig:ridge_cv_plot}, it can be observed that when \(\lambda\) is very large, the penalization is too strong. As a consequence, the model becomes highly constrained and the binomial deviance remains high. Conversely, as \(\lambda\) decreases, the model gains flexibility and the error decreases, indicating that, for the training data, an excessively strong penalization deteriorates the fit.
+
+This suggests that, in order to minimize the binomial deviance, the model needs to remain relatively close to the non-regularized logistic regression. However, since ridge regression retains the \(165\) predictors and does not perform hard variable selection, the signal is still distributed across many predictors, including weak or redundant ones.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../output/part2/ridge_cv/ridge_cv_plot.png}
+\caption{Ten-fold cross-validation curve used to select the ridge regularization parameter. The retained value corresponds to the minimizer of the mean binomial deviance.}
+\label{fig:ridge_cv_plot}
+\end{figure}
