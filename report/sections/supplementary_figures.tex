@@ -120,6 +120,14 @@ PAR\_SFMV24 & 0.9436739 & \(4.84 \times 10^{-40}\) \\
 \subsection{PCA Variable Space}
 \label{subsec:pca_variable_space}
 The following tables summarize the main diagnostics used to interpret the variable space of the PCA after preprocessing and standardization of the 165 retained predictors.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\columnwidth]{../output/part1/inertie_percentage.png}
+\caption{Percentage of inertia explained by each principal component. The dashed horizontal line marks the average contribution \(100/165\).}
+\label{fig:pca_inertia_percentage}
+\end{figure}
+
 \begin{table}[H]
 \centering
 \caption{Cumulative inertia and mean individual quality of representation for selected PCA subspaces.}
@@ -307,3 +315,71 @@ Variables with \(\cos^2(1{:}4)\geq 0.7\) & 20 \\
 \end{tabular}
 \end{table}
 
+\subsection{Silhouette Criterion}
+\label{subsec:silhouette}
+For the clustering step, the number of clusters is selected by maximizing the average silhouette width. For an observation \(x_i\), the silhouette index compares the average dissimilarity to its own cluster with the smallest average dissimilarity to another cluster \cite{rousseeuw1987}:
+\begin{equation}
+\mathrm{sil}(x_i)=\frac{b_i-a_i}{\max(a_i,b_i)}.
+\label{eq:silhouette}
+\end{equation}
+Here, \(a_i\) is the average distance from \(x_i\) to the observations of its own cluster, whereas \(b_i\) is the smallest average distance from \(x_i\) to another cluster. Larger values indicate that the observation is better assigned to its cluster and more clearly separated from the others.
+
+\subsection{Silhouette Plots}
+\label{subsec:silhouette_plots}
+The following figures display the silhouette plots obtained for Ward clustering and for the true genre partition, for each retained PCA dimension and for both preprocessing modes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/not_normalized/silhouette_pca_04_components.png}
+\caption{Silhouette plots for the non-normalized PCA scores with \(d=4\) retained components.}
+\label{fig:silhouette_not_normalized_4}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/not_normalized/silhouette_pca_06_components.png}
+\caption{Silhouette plots for the non-normalized PCA scores with \(d=6\) retained components.}
+\label{fig:silhouette_not_normalized_6}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/not_normalized/silhouette_pca_10_components.png}
+\caption{Silhouette plots for the non-normalized PCA scores with \(d=10\) retained components.}
+\label{fig:silhouette_not_normalized_10}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/not_normalized/silhouette_pca_34_components.png}
+\caption{Silhouette plots for the non-normalized PCA scores with \(d=34\) retained components.}
+\label{fig:silhouette_not_normalized_34}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/normalized/silhouette_pca_04_components.png}
+\caption{Silhouette plots for the normalized PCA scores with \(d=4\) retained components.}
+\label{fig:silhouette_normalized_4}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/normalized/silhouette_pca_06_components.png}
+\caption{Silhouette plots for the normalized PCA scores with \(d=6\) retained components.}
+\label{fig:silhouette_normalized_6}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/normalized/silhouette_pca_10_components.png}
+\caption{Silhouette plots for the normalized PCA scores with \(d=10\) retained components.}
+\label{fig:silhouette_normalized_10}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part1/hclust_pca/normalized/silhouette_pca_34_components.png}
+\caption{Silhouette plots for the normalized PCA scores with \(d=34\) retained components.}
+\label{fig:silhouette_normalized_34}
+\end{figure}
