@@ -1,3 +1,17 @@
 \section{Use of Generative Tools}
-If no generative tool was used, state it explicitly in the introduction and remove this appendix.
-Otherwise, document the tool, the prompts, the tasks supported, and the verification process.
+Generative tools were used only for auxiliary tasks, not to replace the statistical work carried out in \texttt{R}. In particular, they were used to obtain first drafts of code fragments, to suggest report wording, and to produce a preliminary Newton implementation for the multinomial model discussed in the statement.
+
+Representative prompts included the following requests:
+\begin{itemize}
+\item ``Suggest an R procedure to screen strictly positive variables for possible log-transformation using asymmetry and spread-location diagnostics.''
+\item ``Draft a Newton algorithm for multinomial logistic regression with a reference class, and explain how to build the Hessian.''
+\item ``Help rewrite the report in IEEE LaTeX while commenting figures and keeping R commands out of the PDF.''
+\end{itemize}
+
+All outputs produced by these tools were manually verified before being kept. Numerical values reported in this document, such as sample sizes, correlations, explained inertia, AIC values, and AUC values, were always recomputed locally in \texttt{R}. When a generated suggestion did not meet the required standard, it was either corrected or discarded. Two examples are worth mentioning:
+\begin{itemize}
+\item the automatically generated Newton code for multinomial logistic regression had to be checked analytically, especially for the sign and block structure of the Hessian;
+\item some generated coding suggestions were too generic or not sufficiently robust numerically, so they were rewritten before use.
+\end{itemize}
+
+The final statistical conclusions of the report therefore rely on reproducible \texttt{R} computations and not on unverified generated text.
