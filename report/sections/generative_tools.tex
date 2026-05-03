@@ -1,17 +1,10 @@
 \section{Use of Generative Tools}
-Generative tools were used only for auxiliary tasks, not to replace the statistical work carried out in \texttt{R}. In particular, they were used to obtain first drafts of code fragments, to suggest report wording, and to produce a preliminary Newton implementation for the multinomial model discussed in the statement.
+Generative tools were used only in narrowly delimited support tasks and not to replace the statistical analysis carried out in \texttt{R}. Their use was restricted to three situations. First, they were used to help implement formula-based code blocks whose practical implementation had not been explicitly detailed during the in-class coding sessions, while the underlying statistical definition itself remained standard and easily verifiable from course material or cited sources. This concerns in particular the heteroscedasticity screening score and the automatic choice of the number of clusters \(k\) through the silhouette criterion of Rousseeuw. These interventions are explicitly marked in \texttt{main.R} by dedicated comments.
 
-Representative prompts included the following requests:
-\begin{itemize}
-\item ``Suggest an R procedure to screen strictly positive variables for possible log-transformation using asymmetry and spread-location diagnostics.''
-\item ``Draft a Newton algorithm for multinomial logistic regression with a reference class, and explain how to build the Hessian.''
-\item ``Help rewrite the report in IEEE LaTeX while commenting figures and keeping R commands out of the PDF.''
-\end{itemize}
+Second, generative tools were used to suggest technical simplifications for pieces of code that were empirically found to be expensive in repeated execution. The main example is the replacement of some \texttt{ggplot} + \texttt{ggsave} rendering steps inside loops by a lighter \texttt{png()} + base-\texttt{plot()} strategy. This suggestion was not accepted blindly: it was kept only after checking that the output remained consistent with the intended graph and that the change effectively reduced execution time in practice.
 
-All outputs produced by these tools were manually verified before being kept. Numerical values reported in this document, such as sample sizes, correlations, explained inertia, AIC values, and AUC values, were always recomputed locally in \texttt{R}. When a generated suggestion did not meet the required standard, it was either corrected or discarded. Two examples are worth mentioning:
-\begin{itemize}
-\item the automatically generated Newton code for multinomial logistic regression had to be checked analytically, especially for the sign and block structure of the Hessian;
-\item some generated coding suggestions were too generic or not sufficiently robust numerically, so they were rewritten before use.
-\end{itemize}
+Third, generative tools were used in the writing process of the report, mainly for translation and refinement. A first base structure was drafted in Spanish and Portuguese, and the tool was then used to help convert this material into a coherent IEEE-style LaTeX text in English. In this case, the tool was used for wording, organization, and local consistency improvements, not for producing numerical results.
 
-The final statistical conclusions of the report therefore rely on reproducible \texttt{R} computations and not on unverified generated text.
+The prompts were therefore formulated in a precise and technically constrained way. Representative examples include requests such as: ``Implement in \texttt{R} a heteroscedasticity score for strictly positive variables using empirical quantile bins and Spearman correlation between group means and group standard deviations, and identify the sources that justify the construction''; ``Write an \texttt{R} routine that, for Ward clustering on PCA scores, computes the mean silhouette width for \(k=2,\dots,10\) and selects the maximizing value according to Rousseeuw's definition''; ``Suggest a lighter graphics-saving strategy for a loop where \texttt{ggplot} + \texttt{ggsave} is too slow, while preserving the intended output''; and ``Rewrite this verified draft into concise IEEE LaTeX English without inventing results.''
+
+All generated outputs were then validated manually before being retained. When the output involved a formula, the expression was checked against a cited source, against the equations written in the report, or against a direct derivation simple enough to verify locally.
