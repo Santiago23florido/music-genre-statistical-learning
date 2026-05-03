@@ -223,6 +223,66 @@ for (k in c(4, 6, 10, 34)) {
   )
 }
 
+# Variable representation on the first plane and first four axes
+var_cos2_12 = rowSums(res$var$cos2[, 1:2, drop=FALSE])
+var_cos2_14 = rowSums(res$var$cos2[, 1:4, drop=FALSE])
+
+# Top contributing variables for each of the first four PCs
+for (ax in 1:4) {
+  idx = order(res$var$contrib[, ax], decreasing=TRUE)[1:10]
+  
+  print(
+    data.frame(
+      PC = paste0("PC", ax),
+      variable = rownames(res$var$contrib)[idx],
+      contribution = round(res$var$contrib[idx, ax], 3),
+      correlation = round(res$var$coord[idx, ax], 3),
+      cos2_axis = round(res$var$cos2[idx, ax], 3),
+      cos2_plane12 = round(var_cos2_12[idx], 3),
+      cos2_first4 = round(var_cos2_14[idx], 3)
+    ),
+    row.names = FALSE
+  )
+}
+
+# Best represented variables on the first principal plane
+print(
+  data.frame(
+    variable = names(sort(var_cos2_12, decreasing=TRUE)[1:15]),
+    cos2_plane12 = round(sort(var_cos2_12, decreasing=TRUE)[1:15], 3)
+  ),
+  row.names = FALSE
+)
+
+# Best represented variables on the first four axes
+print(
+  data.frame(
+    variable = names(sort(var_cos2_14, decreasing=TRUE)[1:15]),
+    cos2_first4 = round(sort(var_cos2_14, decreasing=TRUE)[1:15], 3)
+  ),
+  row.names = FALSE
+)
+
+# Counts of well-represented variables
+print(
+  data.frame(
+    metric = c(
+      "Variables with cos2(1,2) >= 0.5",
+      "Variables with cos2(1,2) >= 0.7",
+      "Variables with cos2(1:4) >= 0.5",
+      "Variables with cos2(1:4) >= 0.7"
+    ),
+    value = c(
+      sum(var_cos2_12 >= 0.5),
+      sum(var_cos2_12 >= 0.7),
+      sum(var_cos2_14 >= 0.5),
+      sum(var_cos2_14 >= 0.7)
+    )
+  ),
+  row.names = FALSE
+)
+
+
 ####
 #Question 3
 ####
