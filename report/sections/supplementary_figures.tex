@@ -504,3 +504,21 @@ Thus, Equation~\eqref{eq:ridge_logistic_estimator} extends the ridge principle d
 \caption{Ridge coefficient paths as functions of \(-\log(\lambda)\). Moving to the right corresponds to weaker penalization and larger coefficient magnitudes.}
 \label{fig:ridge_coefficients_loglambda}
 \end{figure}
+
+\subsection{ROC Curves}
+\label{subsec:roc_curves}
+The following figures report the ROC comparisons produced in Part II, first for the maximum-likelihood logistic models and then after adding the ridge classifier.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part2/roc/roc_curves.png}
+\caption{ROC curves for the full logistic model, the significance-based reduced models, and the stepwise AIC model.}
+\label{fig:roc_curves_base}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../output/part2/roc/roc_curves_with_ridge.png}
+\caption{ROC curves after adding the ridge logistic classifier to the previous comparison.}
+\label{fig:roc_curves_with_ridge}
+\end{figure}
