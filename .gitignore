@@ -2,7 +2,7 @@
 .RData
 .Ruserdata
 .DS_Store
-.codex
+.latexmkrc
 
 report/build/*
 !report/build/.gitkeep
