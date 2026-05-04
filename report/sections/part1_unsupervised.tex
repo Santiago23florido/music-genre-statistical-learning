@@ -1,43 +1,80 @@
-\section{Part I: Unsupervised Analysis}
-\subsection{Genre Proportions}
-The labeled dataset is moderately unbalanced. Classical is the largest class with 29.82\% of the observations, followed by Jazz with 26.19\%, Rock with 16.88\%, Blues with 13.82\%, and Pop with 13.29\%.
-
-\subsection{Correlation Analysis}
-The unsupervised analysis is performed on a high-dimensional set of 191 numerical descriptors. Given the repeated structure of several feature families such as \texttt{PAR\_ASE}, \texttt{PAR\_SFM}, \texttt{PAR\_MFCC}, and RMS-based variables, correlation analysis is relevant for identifying potentially redundant predictors.
-
-\begin{equation}
-g_{1} = \frac{\sum_{i=1}^{N}(Y_{i} - \bar{Y})^{3}/N}{s^{3}}
-\end{equation}
-
-\begin{equation}
-H(X) = \rho_{s}\!\left(\left(\bar{X}_{b}\right)_{b=1}^{B}, \left(s_{b}\right)_{b=1}^{B}\right),
-\qquad
-s_{b} = \sqrt{\frac{1}{n_{b}-1}\sum_{i \in G_{b}}\left(X_{i}-\bar{X}_{b}\right)^{2}}
-\end{equation}
-
+\section{Unsupervised Analysis}
 \subsection{Principal Component Analysis}
-Principal component analysis is used here as a dimensionality-reduction tool to summarize the 191 acoustic variables in a low-dimensional representation and to inspect whether the five genres exhibit visible structure in the first projection planes.
+The preprocessed data are then centered and scaled. Principal component analysis (PCA) is performed on the centered and scaled matrix of the \(165\) retained predictors, so that the decomposition is driven by the correlation structure rather than by the original measurement scales.
+
+If \(\lambda_k\) denotes the \(k\)-th eigenvalue of the correlation matrix, the proportion of explained inertia associated with axis \(k\) is given by
+\begin{equation}
+\frac{\lambda_k}{\sum_{j=1}^{165}\lambda_j}.
+\label{eq:pca_inertia_ratio}
+\end{equation}
+
+Numerically, the first two principal components explain \(29.79\%\) of the total inertia, the first four explain \(43.52\%\), the first ten explain \(59.01\%\), and the first \(34\) explain \(81.60\%\); these values are summarized in Appendix~\ref{app:skewness}, Subsection~\ref{subsec:pca_variable_space}, Table~\ref{tab:pca_subspace_summary}. Therefore, PCA reveals a nontrivial low-dimensional structure in the data. However, a substantial part of the total variability remains distributed across many directions, which limits the possibility of obtaining a clearly separated five-class visualization in only two dimensions. This limitation can also be observed by analyzing the quality of representation of the individuals. For an observation \(i\), the quality of representation on the first \(k\) principal axes is measured by the cumulative squared cosine:
+\begin{equation}
+\cos^2_i(1{:}k)=\sum_{s=1}^k \cos^2_i(s).
+\label{eq:pca_cumulative_cos2}
+\end{equation}
+
+The mean value of this quantity is \(0.2888\) on the first two axes, \(0.4283\) on the first four axes, \(0.5900\) on the first ten axes, and \(0.8064\) on the first \(34\) axes; see again Table~\ref{tab:pca_subspace_summary}. Hence, the first principal plane captures less than one third of the total information for a typical observation, whereas a substantially better representation is obtained only when considering a higher-dimensional subspace. A similar limitation is observed in the variable space. The analysis of the cumulative squared cosines shows that only a limited subset of variables is well represented on the first principal plane; see Appendix~\ref{app:skewness}, Tables~\ref{tab:pca_best_plane12} and~\ref{tab:pca_representation_counts}. Although the representation improves when the first four principal axes are considered, a large part of the predictor set still requires a higher-dimensional subspace to be properly projected; see Tables~\ref{tab:pca_best_first4} and~\ref{tab:pca_representation_counts}. Consequently, the interpretation of the PCA should not rely exclusively on the first two-dimensional representation, but should also account for higher-dimensional principal subspaces.
+In the first principal plane, the variables with the largest contributions include several descriptors from the spectrum envelope family; see Appendix~\ref{app:skewness}, Table~\ref{tab:pca_pc1_variables}. This suggests that the first principal axis represents a strong contrast mainly associated with these descriptors.
+
+On the second principal axis, the most contributive variables are dominated by variability descriptors and by variables related to temporal features, such as threshold and zero-crossing descriptors; see Table~\ref{tab:pca_pc2_variables}. Therefore, the second axis of the principal plane can be interpreted as being more clearly associated with temporal crossing features and variability-related descriptors.
+
+The relationships between the principal axes of the second plane and the variables of interest are weaker. Nevertheless, the third principal axis still shows an association with temporal crossing features and variability descriptors; see Table~\ref{tab:pca_pc3_variables}. In contrast, the fourth principal axis appears to represent an opposition between certain \texttt{ASE} variables and \texttt{SFM}/\texttt{SFMV} variables, that is, between part of the audio spectrum envelope information and part of the spectral flatness information; see Table~\ref{tab:pca_pc4_variables}.
+
+The first two principal planes are displayed jointly in Fig.~\ref{fig:pca_principal_planes}. From these figures and from the results discussed above, it can be concluded that the first two principal planes are not sufficient to provide an adequate representation of either the individuals or the variables. Although the dataset exhibits a nontrivial underlying structure, this structure is not strongly concentrated in a very low-dimensional subspace. The first principal plane, shown in panel (a) of Fig.~\ref{fig:pca_principal_planes}, reveals a partial horizontal contrast. \textit{Pop} observations are more frequently located on the positive side of the first principal component, whereas \textit{Classical} observations tend to be more concentrated on the negative side. \textit{Rock} also tends to occupy the lower-right region of the plane. However, the point clouds remain broad and strongly overlapping, indicating that the first principal plane does not provide a sharp discrimination among the five musical genres. The second principal plane, shown in panel (b) of Fig.~\ref{fig:pca_principal_planes}, provides additional information, but it does not eliminate the overlap between genres. Overall, the PCA confirms that the dataset contains relevant multivariate structure. Nevertheless, this structure is not organized into five clearly separated linear groups, which limits the discriminative power of a purely two-dimensional PCA visualization.
 
 \begin{figure}[!t]
 \centering
-\fbox{\rule{0pt}{1.6in}\rule{0.9\linewidth}{0pt}}
-\caption{Figure placeholder for an unsupervised summary based on the 7,773 labeled tracks, such as genre proportions or a PCA projection.}
-\label{fig:part1-placeholder}
+\includegraphics[width=\columnwidth]{../output/part1/pca_first_plane.png}
+
+\vspace{2pt}
+\footnotesize{(a) First principal plane \((\mathrm{PC1},\mathrm{PC2})\).}
+
+\vspace{4pt}
+\includegraphics[width=\columnwidth]{../output/part1/pca_second_plane.png}
+
+\vspace{2pt}
+\footnotesize{(b) Second principal plane \((\mathrm{PC3},\mathrm{PC4})\).}
+
+\caption{Composite representation of the two principal planes used in the unsupervised analysis.}
+\label{fig:pca_principal_planes}
 \end{figure}
 
 \subsection{Hierarchical Clustering and Silhouettes}
-Hierarchical clustering and silhouette diagnostics can be applied to the same standardized acoustic descriptors to compare data-driven groupings with the five observed genre labels.
 
-\begin{equation}
-\mathrm{sil}(x_i) = \frac{b_i - a_i}{\max(a_i, b_i)}
-\end{equation}
+For the implementation of the unsupervised classifier, Ward's hierarchical clustering is applied to the PCA scores. Several reduced representations are considered by retaining \(d \in \{4,6,10,34\}\) principal components. The choice \(d=4\) corresponds to the first two principal planes. The values \(d=6\) and \(d=10\) are included because the scree plot of the percentage of inertia explained by each component shows relevant breaks before regions where the marginal gains in inertia become more homogeneous. Finally, \(d=34\) is considered because it corresponds to the set of principal components whose individual contribution remains above the average contribution expected under a uniform distribution of inertia across the variables.
+For each retained dimension \(d\), the number of clusters \(k\) is then chosen by maximizing the average silhouette width over \(k \in \{2,\dots,10\}\); the silhouette criterion is recalled in Appendix~\ref{app:skewness}, Subsection~\ref{subsec:silhouette}, Eq.~\eqref{eq:silhouette}. In addition, the effect of unsupervised classification methods is also evaluated in the PCA-derived spaces after normalizing the retained principal component scores before applying hierarchical clustering. This complementary strategy makes it possible to assess whether differences in the scale of the selected PCA coordinates affect the resulting partitions.
 
-\begin{equation}
-a_i = \frac{1}{|C_k|-1}\sum_{x_\ell \in C_k, \ell \neq i} d(x_i, x_\ell),
-\qquad
-b_i = \min_{k' \neq k}\frac{1}{|C_{k'}|}\sum_{x_\ell \in C_{k'}} d(x_i, x_\ell)
-\end{equation}
+\begin{table}[!t]
+\centering
+\caption{Average silhouette widths for Ward clustering and for the true genre partition.}
+\label{tab:ward_genre_silhouettes}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Mode & PCs & Selected \(k\) & Ward silhouette & Genre silhouette \\
+\midrule
+Not normalized & 4  & 3 & 0.2170 & 0.0725 \\
+Not normalized & 6  & 3 & 0.2029 & 0.0739 \\
+Not normalized & 10 & 2 & 0.1644 & 0.0769 \\
+Not normalized & 34 & 2 & 0.1212 & 0.0563 \\
+Normalized     & 4  & 3 & 0.1943 & 0.0604 \\
+Normalized     & 6  & 3 & 0.1283 & 0.0574 \\
+Normalized     & 10 & 5 & 0.0902 & 0.0532 \\
+Normalized     & 34 & 3 & 0.8171 & -0.0062 \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
-\begin{equation}
-\widehat{K} = \arg\max_{K \in \{2,\ldots,10\}} \frac{1}{n}\sum_{i=1}^{n}\mathrm{sil}(x_i)
-\end{equation}
+The corresponding results are summarized in Table~\ref{tab:ward_genre_silhouettes}. For most dimensions, the Ward partition achieves only moderate average silhouette widths, while the silhouette values induced by the true genre labels remain low, which confirms that the five genres are only weakly separated in these reduced Euclidean representations.
+
+The results make it clear that the partition of the true musical genres in the spaces constructed from the retained PCA variables is weak. The genre-wise silhouette values are low for both normalized and non-normalized representations, even reaching negative average values in the normalized case with \(d=34\). This indicates that the musical genres do not form compact or easily separable groups in the Euclidean spaces and geometries considered. Moreover, this behavior is not homogeneous across genres: although overlap is present for all genres, it is more pronounced for some of them. Therefore, the results obtained with hierarchical clustering not only fail to reproduce the true genre labels, but also reveal that the unsupervised structure preferred by the dataset is different from the five-genre partition. Using the implemented criterion for selecting the number of clusters, the preferred solution is almost always \(k=2\) or \(k=3\). The only case in which \(k=5\) is selected occurs for the normalized representation with \(d=10\), but the corresponding mean silhouette remains very low, with a value of \(0.0902\). Even for the preferred unsupervised partitions, the Ward silhouettes remain weak, which indicates the presence of some structure, but with relatively poor separation between groups.
+
+It is also important to note that, except for the normalized case with \(d=34\), the obtained partitions are not degenerate. In that exceptional case, the clustering produces one very large cluster containing \(7{,}766\) observations and two extremely small clusters of sizes \(3\) and \(4\), which suggests that the corresponding partition is not meaningful for interpretation. In general, normalization tends to reduce the average silhouette obtained by the unsupervised method when compared with the non-normalized PCA representations. This effect may be associated with the fact that normalization assigns equivalent weight to axes that do not contain the same amount of data variability. Since the first principal components are precisely those that concentrate the dominant structure, reweighting all retained axes equally can alter the distances between observations and increase the overlap between the hierarchical structures identified by the clustering algorithm. Overall, it can be concluded that the dataset does contain multivariate structure. However, this structure appears to be organized into a small number of broad and not fully separated groups, rather than into five well-defined clusters aligned with the musical genres.
+
+\subsection{Train Test split}
+
+The project includes an unlabeled holdout file. However, the project statement also requires an internal train--test split within the labeled sample. Therefore, the prescribed random split is applied, assigning observations to the training set with probability \(2/3\) and to the test set with probability \(1/3\), using \texttt{set.seed(103)} for reproducibility.
+
+The binary \textit{Classical} versus \textit{Jazz} subsets derived from this split are used in Section~IV.
