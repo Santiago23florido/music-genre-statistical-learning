@@ -1,0 +1,5 @@
+Confusion matrix for Mod1 
+           Actual
+Predicted   Classical Jazz
+  Classical       735   94
+  Jazz             71  603

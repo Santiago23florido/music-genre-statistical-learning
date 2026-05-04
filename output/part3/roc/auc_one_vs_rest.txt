@@ -1,0 +1,8 @@
+One-vs-Rest AUC values:
+  Blues : 0.9986 
+  Classical : 0.9778 
+  Jazz : 0.9676 
+  Pop : 0.9943 
+  Rock : 0.9898 
+
+Mean AUC: 0.9856 

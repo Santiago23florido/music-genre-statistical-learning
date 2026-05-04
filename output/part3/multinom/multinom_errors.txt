@@ -1,0 +1,20 @@
+Training error: 0.06809339 
+Test error: 0.1021648 
+
+Training confusion matrix:
+           Actual
+Predicted   Blues Classical Jazz  Pop Rock
+  Blues       698         0    0    2    5
+  Classical     1      1402  141    0    1
+  Jazz          0       109 1182    0   20
+  Pop           1         0    1  659   20
+  Rock          6         1   15   27  849
+
+Test confusion matrix:
+           Actual
+Predicted   Blues Classical Jazz Pop Rock
+  Blues       362         5    5   6    7
+  Classical     2       723   88   1    0
+  Jazz          0        75  583   2   18
+  Pop           0         1    2 317   13
+  Rock          4         2   19  19  379

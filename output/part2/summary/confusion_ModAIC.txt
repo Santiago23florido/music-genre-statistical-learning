@@ -1,0 +1,5 @@
+Confusion matrix for ModAIC 
+           Actual
+Predicted   Classical Jazz
+  Classical       739   71
+  Jazz             67  626

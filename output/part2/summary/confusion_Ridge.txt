@@ -1,0 +1,5 @@
+Confusion matrix for Ridge 
+           Actual
+Predicted   Classical Jazz
+  Classical       737  105
+  Jazz             69  592

@@ -1,0 +1,5 @@
+nnet direct call results:
+Training error: 0.06634241 
+Test error: 0.1052032 
+Prediction agreement with multinom (train): 0.9902724 
+Prediction agreement with multinom (test): 0.985188 

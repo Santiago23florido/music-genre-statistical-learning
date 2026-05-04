@@ -1,0 +1,6 @@
+   Model AUC_test Accuracy_test Error_rate_test Num_variables
+1   ModT   0.9627        0.9095          0.0905           165
+2   Mod1   0.9543        0.8902          0.1098            58
+3   Mod2   0.9605        0.9022          0.0978            82
+4 ModAIC   0.9629        0.9082          0.0918            91
+5  Ridge   0.9414        0.8842          0.1158           165

@@ -8,9 +8,11 @@ library(cluster)
 library(MASS)
 library(ROCR)
 library(glmnet)
+library(nnet)
 
 rm(list=objects())
-graphics.off(); seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
+graphics.off(); 
+seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
 dir.create("output/part1", recursive=TRUE, showWarnings=FALSE)
 dir.create("output/part1/hclust_pca", recursive=TRUE, showWarnings=FALSE)
 #################
@@ -326,7 +328,7 @@ binary_train = seeds_filtered[train & seeds_filtered[,p_filtered] %in% binary_ge
 binary_test = seeds_filtered[!train & seeds_filtered[,p_filtered] %in% binary_genres, ]
 
 #Check the requested sample sizes
-c(nrow(binary_train), nrow(binary_test))
+c(nrow(binary_train), nrow(binary_test)) # ok
 
 ####
 #Question 1
@@ -693,3 +695,296 @@ capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.t
 capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
 capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
 capture.output(AUC.R.test, file="output/part2/roc/ModRidge_auc_test.txt")
+
+####
+#Question 6
+####
+
+dir.create("output/part2/summary", recursive=TRUE, showWarnings=FALSE)
+
+# Predictions on the test set for each model (probability of Jazz)
+threshold = 0.5
+pred_probs = list(
+  ModT   = predict(ModT,   newdata=test_ModT, type="response"),
+  Mod1   = predict(Mod1,   newdata=test_Mod1, type="response"),
+  Mod2   = predict(Mod2,   newdata=test_Mod2, type="response"),
+  ModAIC = predict(ModAIC, newdata=test_ModT, type="response"),
+  Ridge  = as.numeric(predict(ModRidge, newx=x.test, type="response"))
+)
+
+# Accuracy and error rate at threshold 0.5
+accuracy = sapply(pred_probs, function(pp) {
+  pred_class = ifelse(pp > threshold, 1, 0)
+  mean(pred_class == Y_test)
+})
+error_rate = 1 - accuracy
+
+# Number of variables per model
+n_vars = c(
+  ModT   = length(coef(ModT)) - 1,
+  Mod1   = length(coef(Mod1)) - 1,
+  Mod2   = length(coef(Mod2)) - 1,
+  ModAIC = length(coef(ModAIC)) - 1,
+  Ridge  = ncol(x)
+)
+
+# Summary table
+summary_table = data.frame(
+  Model          = names(pred_probs),
+  AUC_test       = c(AUC.T.test, AUC.1.test, AUC.2.test, AUC.AIC.test, AUC.R.test),
+  Accuracy_test  = round(accuracy, 4),
+  Error_rate_test = round(error_rate, 4),
+  Num_variables  = n_vars,
+  row.names      = NULL
+)
+print(summary_table)
+capture.output(print(summary_table), file="output/part2/summary/model_comparison.txt")
+
+# Bar plot comparing AUC across models
+summary_plot = ggplot(summary_table, aes(x=reorder(Model, -AUC_test), y=AUC_test)) +
+  geom_col(fill="steelblue") +
+  geom_text(aes(label=AUC_test), vjust=-0.3) +
+  ylim(0, 1) +
+  xlab("Model") + ylab("AUC (test)") +
+  ggtitle("Model Comparison: AUC on Test Set")
+ggsave("output/part2/summary/model_comparison_auc.png", summary_plot)
+
+# Confusion matrices for each model
+for (nm in names(pred_probs)) {
+  pred_class = ifelse(pred_probs[[nm]] > threshold, "Jazz", "Classical")
+  cm = table(Predicted=pred_class, Actual=binary_test$GENRE)
+  cat("\n--- Confusion matrix for", nm, "---\n")
+  print(cm)
+  capture.output(
+    {cat("Confusion matrix for", nm, "\n"); print(cm)},
+    file=sprintf("output/part2/summary/confusion_%s.txt", nm)
+  )
+}
+
+# Generalization performance estimate: the test AUC of the best model
+best_model_name = summary_table$Model[which.max(summary_table$AUC_test)]
+cat("\nRecommended model:", best_model_name, "\n")
+cat("Estimated generalization AUC:", max(summary_table$AUC_test), "\n")
+
+# Predict on external test data (Music_test_2026.txt)
+test_extern = read.table("data/Music_test_2026.txt", header=TRUE, sep=";")
+
+# Apply the same preprocessing as training data
+test_extern[, c("PAR_SC_V", "PAR_ASC_V")] = log(test_extern[, c("PAR_SC_V", "PAR_ASC_V")])
+
+# Select the same feature columns used in the ridge model
+feature_cols = colnames(x)
+x_extern = as.matrix(test_extern[, feature_cols, drop=FALSE])
+
+# Predict with the ridge model (cross-validated lambda)
+pred_extern = predict(ModRidge, newx=x_extern, type="response")
+pred_genres = ifelse(pred_extern > 0.5, "Jazz", "Classical")
+
+writeLines(pred_genres, "GustavoLoiola-SantiagoFlorido_test.txt")
+cat("Predictions saved to GustavoLoiola-SantiagoFlorido_test.txt\n")
+cat("Distribution of predictions:\n")
+print(table(pred_genres))
+
+#################
+# PART III
+#################
+
+dir.create("output/part3", recursive=TRUE, showWarnings=FALSE)
+
+# Use all 5 genres from the filtered dataset
+multi_train = seeds_filtered[train, ]
+multi_test  = seeds_filtered[!train, ]
+
+multi_train$GENRE = as.factor(multi_train$GENRE)
+multi_test$GENRE  = as.factor(multi_test$GENRE)
+
+c(nrow(multi_train), nrow(multi_test))
+table(multi_train$GENRE)
+table(multi_test$GENRE)
+
+####
+#Question 4 - Multinomial logistic regression with multinom
+####
+
+dir.create("output/part3/multinom", recursive=TRUE, showWarnings=FALSE)
+
+# Estimate the multinomial logistic model
+# multinom uses the last level as reference by default
+multi_fit = multinom(GENRE ~ ., data=multi_train, MaxNWts=10000, maxit=300)
+summary(multi_fit)
+
+capture.output(summary(multi_fit), file="output/part3/multinom/multinom_summary.txt")
+
+# Training error
+pred_train_multi = predict(multi_fit, newdata=multi_train)
+err_train_multi  = mean(pred_train_multi != multi_train$GENRE)
+
+# Test error
+pred_test_multi = predict(multi_fit, newdata=multi_test)
+err_test_multi  = mean(pred_test_multi != multi_test$GENRE)
+
+cat("Multinomial logistic regression:\n")
+cat("  Training error rate:", round(err_train_multi, 4), "\n")
+cat("  Test error rate:    ", round(err_test_multi, 4), "\n")
+
+# Confusion matrices
+cm_train_multi = table(Predicted=pred_train_multi, Actual=multi_train$GENRE)
+cm_test_multi  = table(Predicted=pred_test_multi,  Actual=multi_test$GENRE)
+
+cat("\n--- Training confusion matrix ---\n")
+print(cm_train_multi)
+cat("\n--- Test confusion matrix ---\n")
+print(cm_test_multi)
+
+capture.output(
+  {
+    cat("Training error:", err_train_multi, "\n")
+    cat("Test error:", err_test_multi, "\n\n")
+    cat("Training confusion matrix:\n"); print(cm_train_multi)
+    cat("\nTest confusion matrix:\n"); print(cm_test_multi)
+  },
+  file="output/part3/multinom/multinom_errors.txt"
+)
+
+####
+#Question 5 - Neural network equivalence with nnet
+####
+
+# The multinom function internally calls nnet with:
+#   size = 0       -> no hidden layer
+#   skip = TRUE    -> direct input-to-output connections
+#   softmax = TRUE -> softmax activation at the output
+#   entropy = TRUE -> cross-entropy loss function
+#   rang = 0       -> zero initialization (or small random)
+#
+# Architecture:
+#   Input layer:  p features (one node per predictor)
+#   Hidden layer: none (size = 0)
+#   Output layer: C-1 nodes (one per non-reference class), softmax
+#   The model computes: eta_c(x) = x * theta_c for c=1,...,C-1
+#   and pi_c(x) = exp(eta_c) / (1 + sum exp(eta_j))
+#
+# This is a single-layer network (no hidden units) equivalent to
+# multinomial logistic regression (softmax regression).
+
+dir.create("output/part3/nnet", recursive=TRUE, showWarnings=FALSE)
+
+# Prepare data for nnet: class indicator matrix for the response
+Y_train_ind = class.ind(multi_train$GENRE)
+X_train_mat = as.matrix(multi_train[, names(multi_train) != "GENRE"])
+
+Y_test_ind = class.ind(multi_test$GENRE)
+X_test_mat = as.matrix(multi_test[, names(multi_test) != "GENRE"])
+
+# Call nnet directly to reproduce multinom
+# multinom internally uses rang = 1/(max(abs(X))+1) and decay = 0
+set.seed(1)
+nn_fit = nnet(
+  x       = X_train_mat,
+  y       = Y_train_ind,
+  size    = 0,
+  skip    = TRUE,
+  softmax = TRUE,
+  entropy = TRUE,
+  rang    = 1 / (max(abs(X_train_mat)) + 1),  # match multinom's initialization
+  decay   = 0,
+  MaxNWts = 10000,
+  maxit   = 300
+)
+
+# Compare predictions with multinom
+pred_nn_train = predict(nn_fit, newdata=X_train_mat, type="class")
+pred_nn_test  = predict(nn_fit, newdata=X_test_mat,  type="class")
+
+err_nn_train = mean(pred_nn_train != multi_train$GENRE)
+err_nn_test  = mean(pred_nn_test  != multi_test$GENRE)
+
+cat("\nnnet direct call:\n")
+cat("  Training error rate:", round(err_nn_train, 4), "\n")
+cat("  Test error rate:    ", round(err_nn_test, 4), "\n")
+
+# Compare coefficients between multinom and nnet
+# With softmax=TRUE, nnet creates C output units (not C-1)
+# Total weights: C * (p + 1), arranged as (bias + p skip weights) per output
+C_classes = ncol(Y_train_ind)
+p_feat    = ncol(X_train_mat)
+coef_nnet = matrix(nn_fit$wts, nrow = p_feat + 1, ncol = C_classes)
+
+cat("\nPrediction agreement (multinom vs nnet):\n")
+cat("  Train:", mean(as.character(pred_train_multi) == pred_nn_train), "\n")
+cat("  Test: ", mean(as.character(pred_test_multi) == pred_nn_test), "\n")
+
+capture.output(
+  {
+    cat("nnet direct call results:\n")
+    cat("Training error:", err_nn_train, "\n")
+    cat("Test error:", err_nn_test, "\n")
+    cat("Prediction agreement with multinom (train):", mean(as.character(pred_train_multi) == pred_nn_train), "\n")
+    cat("Prediction agreement with multinom (test):", mean(as.character(pred_test_multi) == pred_nn_test), "\n")
+  },
+  file="output/part3/nnet/nnet_comparison.txt"
+)
+
+####
+#Question 6 - One-vs-rest ROC curves for 5 classes
+####
+
+# With C > 2 classes, a single ROC curve is insufficient because:
+# - ROC curves are defined for binary decisions (positive vs. negative)
+# - With C classes, there is no natural single positive/negative partition
+# - Each class needs its own "one vs. rest" binary evaluation
+# Therefore, we plot C separate ROC curves (one per class)
+
+dir.create("output/part3/roc", recursive=TRUE, showWarnings=FALSE)
+
+# Get predicted probabilities from multinom on the test set
+probs_test = predict(multi_fit, newdata=multi_test, type="prob")
+genres = levels(multi_test$GENRE)
+
+# Build all one-vs-rest ROC data
+roc_list = list()
+auc_list = c()
+
+for (g in genres) {
+  y_binary = as.numeric(multi_test$GENRE == g)
+  pred_obj = prediction(probs_test[, g], y_binary)
+  roc_perf = performance(pred_obj, "tpr", "fpr")
+  auc_val  = round(performance(pred_obj, "auc")@y.values[[1]], 4)
+
+  roc_list[[g]] = data.frame(
+    FPR   = unlist(roc_perf@x.values),
+    TPR   = unlist(roc_perf@y.values),
+    Genre = paste0(g, " (AUC = ", auc_val, ")")
+  )
+  auc_list[g] = auc_val
+}
+
+roc_df = do.call(rbind, roc_list)
+
+# Plot all 5 ROC curves on a single figure
+roc_multi_plot = ggplot(roc_df, aes(x=FPR, y=TPR, color=Genre)) +
+  geom_line(linewidth=0.8) +
+  geom_abline(slope=1, intercept=0, linetype="dashed", color="grey50") +
+  labs(
+    title = "One-vs-Rest ROC Curves (Multinomial Logistic Regression)",
+    x     = "False Positive Rate (1 - Specificity)",
+    y     = "True Positive Rate (Sensitivity)",
+    color = "Genre"
+  ) +
+  theme_minimal()
+
+ggsave("output/part3/roc/roc_one_vs_rest.png", roc_multi_plot, width=10, height=7)
+
+# Save AUC values
+capture.output(
+  {
+    cat("One-vs-Rest AUC values:\n")
+    for (g in genres) cat(" ", g, ":", auc_list[g], "\n")
+    cat("\nMean AUC:", round(mean(auc_list), 4), "\n")
+  },
+  file="output/part3/roc/auc_one_vs_rest.txt"
+)
+
+cat("\nOne-vs-Rest AUC values:\n")
+print(auc_list)
+cat("Mean AUC:", round(mean(auc_list), 4), "\n")
