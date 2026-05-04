@@ -3,6 +3,7 @@
 .Ruserdata
 .DS_Store
 .latexmkrc
+
 report/build/*
 !report/build/.gitkeep
 report/*.aux
