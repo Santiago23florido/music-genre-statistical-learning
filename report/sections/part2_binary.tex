@@ -75,7 +75,7 @@ Table~\ref{tab:model_comparison} summarizes the main performance indicators for 
 \caption{Performance summary for all binary classifiers on the test set.}
 \label{tab:model_comparison}
 \scriptsize
-\resizebox{\columnwidth}{!}{%
+
 \begin{tabular}{lcccc}
 \toprule
 Model & AUC (test) & Accuracy & Error rate & \# Variables \\
@@ -86,7 +86,7 @@ Mod2   & 0.9605 & 0.9022 & 0.0978 & 82 \\
 ModAIC & 0.9629 & 0.9082 & 0.0918 & 91 \\
 Ridge  & 0.9414 & 0.8842 & 0.1158 & 165 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 The ridge model achieves a competitive AUC despite using a soft rather than hard variable-selection strategy, confirming that regularization provides a meaningful alternative to coefficient-wise significance thresholding when many predictors are correlated.

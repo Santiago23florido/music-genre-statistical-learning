@@ -50,7 +50,7 @@ For each retained dimension \(d\), the number of clusters \(k\) is then chosen b
 \caption{Average silhouette widths for Ward clustering and for the true genre partition.}
 \label{tab:ward_genre_silhouettes}
 \scriptsize
-\resizebox{\columnwidth}{!}{%
+
 \begin{tabular}{lcccc}
 \toprule
 Mode & PCs & Selected \(k\) & Ward silhouette & Genre silhouette \\
@@ -66,7 +66,7 @@ Normalized     & 10 & 5 & 0.0902 & 0.0532 \\
 Normalized     & 34 & 3 & 0.8171 & -0.0062 \\
 Normalized     & 165 & 2 & 0.6843 & -0.0435 \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 \end{table}
 
 The corresponding results are summarized in Table~\ref{tab:ward_genre_silhouettes}. For most dimensions, the Ward partition achieves only moderate average silhouette widths, while the silhouette values induced by the true genre labels remain low, which confirms that the five genres are only weakly separated in these reduced Euclidean representations.

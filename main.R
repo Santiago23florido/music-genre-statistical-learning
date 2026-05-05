@@ -841,18 +841,12 @@ test_extern = read.table("data/Music_test_2026.txt", header=TRUE, sep=";")
 # Apply the same preprocessing as training data
 test_extern[, c("PAR_SC_V", "PAR_ASC_V")] = log(test_extern[, c("PAR_SC_V", "PAR_ASC_V")])
 
-# Select the same feature columns used in the ridge model
-feature_cols = colnames(x)
-x_extern = as.matrix(test_extern[, feature_cols, drop=FALSE])
-
-# Predict with the ridge model (cross-validated lambda)
-pred_extern = predict(ModRidge, newx=x_extern, type="response")
+# Predict with the best empirical model (ModAIC)
+pred_extern = predict(ModAIC, newdata=test_extern, type="response")
 pred_genres = ifelse(pred_extern > 0.5, "Jazz", "Classical")
 
 writeLines(pred_genres, "GustavoLoiola-SantiagoFlorido_test.txt")
-cat("Predictions saved to GustavoLoiola-SantiagoFlorido_test.txt\n")
-cat("Distribution of predictions:\n")
-print(table(pred_genres))
+
 
 #################
 # PART III
