@@ -19,6 +19,28 @@ However, the predictor space has a relatively high dimension, with \(165\) retai
 
 This comparison makes it possible to evaluate the effect of variable selection on model complexity, numerical stability, interpretability, and predictive performance.
 
+The relative adequacy of the reduced unpenalized logistic models with respect to the full model is assessed through likelihood-ratio tests based on deviance differences. The corresponding results are reported in Table~\ref{tab:binary_adequacy_tests}.
+
+\begin{table}[!t]
+\caption{Adequacy Tests of Reduced Logistic Models Against the Full Model}
+\label{tab:binary_adequacy_tests}
+\centering
+\footnotesize
+\begin{tabular}{lcccc}
+\hline
+Model & Df & Deviance & \(p\)-value & Adequate \\
+\hline
+\texttt{Mod1} & 107 & 256.51 & \(2.70 \times 10^{-14}\) & No \\
+\texttt{Mod2} & 83 & 109.65 & 0.0267 & No \\
+\texttt{ModAIC} & 74 & 37.01 & 0.9999 & Yes \\
+\hline
+\end{tabular}
+\end{table}
+
+The reduced models are evaluated through adequacy tests in order to determine whether a simpler specification can preserve the essential fit of the full logistic model. In logistic regression, this is assessed by comparing nested models using the difference in deviances, which measures the gain in log-likelihood obtained when moving from the reduced model to the complete model.
+
+As shown in Fig.~\ref{tab:binary_adequacy_tests}, only the stepwise AIC model exhibits an adequate behavior. The deviance-based likelihood-ratio comparison indicates that \texttt{ModAIC} is not significantly inferior to \texttt{ModT}, suggesting that the AIC-selected model retains the essential fit of the full specification while using fewer predictors.
+
 \subsection{Regularized Logistic Regression}
 
 The interest of ridge regression in this study comes from the combination of a high-dimensional predictor space and residual dependence between acoustic descriptors, even after the preprocessing stage. In such a setting, an unpenalized logistic model may yield unstable coefficient estimates and may overfit the training data. Ridge regularization addresses this issue by shrinking the coefficients toward zero, which improves numerical stability and reduces the variance of the fitted classifier.
