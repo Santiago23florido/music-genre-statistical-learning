@@ -11,10 +11,10 @@ P(Y = 1 \mid X = x) =
 
 However, the predictor space has a relatively high dimension, with \(165\) retained predictors. For this reason, several maximum-likelihood logistic regression models are compared, each imposing a different restriction on the number of retained variables. The models are defined as follows:
 \begin{itemize}
-    \item \textbf{Full logistic model:} includes the \(165\) retained predictors.
-    \item \textbf{Significance-based models:} retain only predictors whose coefficients satisfy a predefined significance threshold.
-    \item \textbf{Stepwise logistic model:} selects variables using the \texttt{stepAIC} criterion.
-    \item \textbf{Reduced logistic models:} use a smaller subset of indicators to improve parsimony and interpretability.
+    \item \textbf{Full logistic model (ModT):} includes all \(165\) retained predictors.
+    \item \textbf{Mod1:} retains only predictors whose Wald p-value satisfies \(p_j < 0.05\) in ModT.
+    \item \textbf{Mod2:} retains only predictors whose Wald p-value satisfies \(p_j < 0.20\) in ModT.
+    \item \textbf{Stepwise logistic model (ModAIC):} selects variables by applying \texttt{stepAIC} to ModT.
 \end{itemize}
 
 This comparison makes it possible to evaluate the effect of variable selection on model complexity, numerical stability, interpretability, and predictive performance.
@@ -51,11 +51,11 @@ In the \texttt{glmnet} algorithm, two extreme values of the regularization param
 
 Ridge regularization does not produce a single model directly, but rather a complete regularization path, corresponding to the family of fitted models obtained for different values of \(\lambda\). However, from this family of models, it is necessary to select one final specification associated with a particular value of the regularization parameter.
 
-The method proposed for selecting this value of \(\lambda\) is 10-fold cross-validation. The training set is divided into 10 subsamples. Successively, 9 of them are used to fit the ridge model, while the remaining subsample is used to evaluate the prediction error. This procedure is repeated until each fold has been used once as the validation sample.
+The method proposed for selecting this value of \(\lambda$ is 10-fold cross-validation. The training set is divided into 10 subsamples. Successively, 9 of them are used to fit the ridge model, while the remaining subsample is used to evaluate the prediction error. This procedure is repeated until each fold has been used once as the validation sample.
 
-For each value of \(\lambda\) in the grid, the prediction errors obtained over the 10 folds are averaged. The final retained value is \texttt{lambda.min}, that is, the value of \(\lambda\) that minimizes the mean cross-validation error. This leads to the final regularized model used for the binary classification task.
+For each value of \(\lambda$ in the grid, the prediction errors obtained over the 10 folds are averaged. The final retained value is \texttt{lambda.min}, that is, the value of \(\lambda$ that minimizes the mean cross-validation error. This leads to the final regularized model used for the binary classification task.
 
-From the cross-validation results, displayed in Fig.~\ref{fig:ridge_cv_plot}, it can be observed that when \(\lambda\) is very large, the penalization is too strong. As a consequence, the model becomes highly constrained and the binomial deviance remains high. Conversely, as \(\lambda\) decreases, the model gains flexibility and the error decreases, indicating that, for the training data, an excessively strong penalization deteriorates the fit.
+From the cross-validation results, displayed in Fig.~\ref{fig:ridge_cv_plot}, it can be observed that when \(\lambda$ is very large, the penalization is too strong. As a consequence, the model becomes highly constrained and the binomial deviance remains high. Conversely, as \(\lambda$ decreases, the model gains flexibility and the error decreases, indicating that, for the training data, an excessively strong penalization deteriorates the fit.
 
 This suggests that, in order to minimize the binomial deviance, the model needs to remain relatively close to the non-regularized logistic regression. However, since ridge regression retains the \(165\) predictors and does not perform hard variable selection, the signal is still distributed across many predictors, including weak or redundant ones.
 
@@ -65,3 +65,30 @@ This suggests that, in order to minimize the binomial deviance, the model needs 
 \caption{Ten-fold cross-validation curve used to select the ridge regularization parameter. The retained value corresponds to the minimizer of the mean binomial deviance.}
 \label{fig:ridge_cv_plot}
 \end{figure}
+
+\subsection{Summary of Binary Classification Results}
+
+Table~\ref{tab:model_comparison} summarizes the main performance indicators for all five models evaluated on the test set. The AUC values are uniformly high, reflecting the strong linear separability of \textit{Classical} and \textit{Jazz} in the acoustic feature space. All models outperform the random baseline by a large margin.
+
+\begin{table}[!t]
+\centering
+\caption{Performance summary for all binary classifiers on the test set.}
+\label{tab:model_comparison}
+\scriptsize
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccc}
+\toprule
+Model & AUC (test) & Accuracy & Error rate & \# Variables \\
+\midrule
+ModT   & 0.9627 & 0.9095 & 0.0905 & 165 \\
+Mod1   & 0.9543 & 0.8902 & 0.1098 & 58 \\
+Mod2   & 0.9605 & 0.9022 & 0.0978 & 82 \\
+ModAIC & 0.9629 & 0.9082 & 0.0918 & 91 \\
+Ridge  & 0.9414 & 0.8842 & 0.1158 & 165 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+The ridge model achieves a competitive AUC despite using a soft rather than hard variable-selection strategy, confirming that regularization provides a meaningful alternative to coefficient-wise significance thresholding when many predictors are correlated.
+
+Based on the empirical evaluation on the test set, \textbf{ModAIC} achieves the highest AUC (\(0.9629\)) and the second highest accuracy (\(0.9082\)). It also provides a more parsimonious representation than the full and ridge models by reducing the active predictor space from \(165\) to \(91\) variables. Consequently, \textbf{ModAIC} is selected as the final binary classifier for this task. The genre predictions for the unlabeled holdout file were generated using this model and saved to the corresponding submission file.

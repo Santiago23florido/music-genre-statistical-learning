@@ -1,0 +1,9 @@
+\section{Conclusion}
+
+This work studied the problem of automatic music genre recognition from a high-dimensional set of acoustic descriptors. After a preprocessing stage that reduced redundancy and applied targeted logarithmic transformations, the data were analyzed both in an unsupervised and a supervised framework.
+
+The unsupervised analysis revealed that the five musical genres do not form compact or well-separated clusters in the Euclidean spaces constructed from the retained PCA components. The hierarchical clustering with Ward's method consistently preferred solutions with two or three groups, and the genre-wise silhouette values remained low throughout, indicating that the genre structure is not strongly encoded in the principal subspaces of the descriptor matrix.
+
+In contrast, the supervised binary classifiers achieved high discriminative performance when distinguishing \textit{Classical} from \textit{Jazz}. All five models, including the full logistic model, the significance-based reductions, the stepwise AIC selection, and the ridge regularized classifier, produced test AUC values consistently above \(0.94\), confirming the strong linear separability of these two genres in the acoustic feature space. The stepwise AIC model (\textbf{ModAIC}) achieved the highest empirical test performance and was selected as the final binary classifier to generate the genre predictions for the unlabeled holdout file.
+
+The multinomial extension to five genres introduced additional complexity, both statistically and computationally. The class probabilities were modeled through the softmax link function, and the Newton estimation procedure was shown to coincide with IRLS in this setting. The one-versus-rest evaluation framework confirmed that the discriminative performance varies across genres, with some categories being substantially easier to separate from the rest than others.
