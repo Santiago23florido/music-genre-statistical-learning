@@ -172,7 +172,7 @@ p_pca = ncol(seeds_pca)
 #Question 2
 ####
 
-res = PCA(seeds_pca[,-p_pca],ncp=40, graph=FALSE)
+res = PCA(seeds_pca[,-p_pca],ncp=165, graph=FALSE)
 #Proper values study
 
 round(res$eig,4) # variance of each axe
@@ -299,7 +299,7 @@ dir.create("output/part1/hclust_pca/normalized", recursive=TRUE, showWarnings=FA
 #Hclust estimation for all ACP resultant candidates 4 6 10 34
 #ggplot +ggsave  rendering to expensive LLM suggestion to implement png + plot suggested
 for (mode in c("not_normalized", "normalized")) {
-  for (d in c(4, 6, 10, 34)) {
+  for (d in c(4, 6, 10, 34, 165)) {
     X_acp = res$ind$coord[, 1:d, drop=FALSE]
     if (mode == "normalized") {
       X_acp = scale(X_acp, center=TRUE, scale=TRUE)
@@ -573,6 +573,15 @@ capture.output(summary(ModT), file="output/part2/roc/ModT_summary_for_adequacy.t
 capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.txt")
 capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
 capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
+
+# Adequacy of reduced logistic models relative to the full model
+adequacy_Mod1 = anova(Mod1, ModT, test = "Chisq")
+adequacy_Mod2 = anova(Mod2, ModT, test = "Chisq")
+adequacy_ModAIC = anova(ModAIC, ModT, test = "Chisq")
+
+capture.output(adequacy_Mod1, file = "output/part2/models/Mod1_adequacy.txt")
+capture.output(adequacy_Mod2, file = "output/part2/models/Mod2_adequacy.txt")
+capture.output(adequacy_ModAIC, file = "output/part2/models/ModAIC_adequacy.txt")
 
 ####
 #Question 3
