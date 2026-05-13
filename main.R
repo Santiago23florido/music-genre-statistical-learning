@@ -9,6 +9,7 @@ library(MASS)
 library(ROCR)
 library(glmnet)
 library(nnet)
+library(e1071)
 
 rm(list=objects())
 graphics.off(); 
@@ -847,6 +848,172 @@ pred_genres = ifelse(pred_extern > 0.5, "Jazz", "Classical")
 
 writeLines(pred_genres, "GustavoLoiola-SantiagoFlorido_test.txt")
 
+####
+#Question 6 - Bonus
+####
+
+dir.create("output/part2/lasso", recursive=TRUE, showWarnings=FALSE)
+
+# LLM suggestion for checking advance: report the main regularization milestones while comparing penalized models.
+lasso_log = function(step_text){
+  cat(sprintf("%s | Lasso bonus | %s\n", format(Sys.time(), "%H:%M:%S"), step_text))
+}
+
+# Use the same stratified folds across all penalized models for a fair comparison
+bonus_nfolds = 10
+set.seed(1)
+bonus_foldid = integer(length(y))
+for (cls in sort(unique(y))) {
+  idx = which(y == cls)
+  bonus_foldid[idx] = sample(rep(seq_len(bonus_nfolds), length.out=length(idx)))
+}
+
+# Reference code adapted from the official glmnet introduction vignette:
+# https://glmnet.stanford.edu/articles/glmnet.html
+lasso_log("Starting 10-fold cross-validation for Lasso.")
+set.seed(1)
+cv.lasso = cv.glmnet(
+  x,
+  y,
+  alpha=1,
+  family="binomial",
+  foldid=bonus_foldid,
+  type.measure="auc",
+  trace.it=1
+)
+
+bestlam.lasso = cv.lasso$lambda.min
+lasso_log(sprintf("Lasso lambda.min selected = %.6g", bestlam.lasso))
+
+ModLasso = glmnet(x, y, alpha=1, lambda=bestlam.lasso, family="binomial")
+lasso_log("Final Lasso fit completed.")
+
+saveRDS(ModLasso, "output/part2/lasso/lasso_fit_final.rds")
+lasso_log("Lasso model saved in output/part2/lasso/lasso_fit_final.rds")
+
+predL_test = prediction(as.numeric(predict(ModLasso, newx=x.test, type="response")), Y_test)
+ROC.L.test = performance(predL_test, "sens", "fpr")
+AUC.L.test = round(performance(predL_test, "auc")@y.values[[1]], 4)
+lasso_log(sprintf("Lasso test AUC = %.4f", AUC.L.test))
+
+# Reference code adapted from the official glmnet relaxed lasso vignette:
+# https://glmnet.stanford.edu/articles/relax.html
+lasso_log("Starting 10-fold cross-validation for Relaxed Lasso.")
+set.seed(1)
+cv.relaxed.lasso = cv.glmnet(
+  x,
+  y,
+  alpha=1,
+  family="binomial",
+  foldid=bonus_foldid,
+  type.measure="auc",
+  relax=TRUE,
+  trace.it=1
+)
+
+bestlam.relaxed = cv.relaxed.lasso$relaxed$lambda.min
+bestgamma.relaxed = cv.relaxed.lasso$relaxed$gamma.min
+lasso_log(sprintf("Relaxed Lasso lambda.min selected = %.6g", bestlam.relaxed))
+lasso_log(sprintf("Relaxed Lasso gamma.min selected = %.2f", bestgamma.relaxed))
+
+saveRDS(cv.relaxed.lasso, "output/part2/lasso/relaxed_lasso_cv_fit.rds")
+lasso_log("Relaxed Lasso CV model saved in output/part2/lasso/relaxed_lasso_cv_fit.rds")
+
+predRelaxed_test = prediction(
+  as.numeric(
+    predict(
+      cv.relaxed.lasso,
+      newx=x.test,
+      s="lambda.min",
+      gamma="gamma.min",
+      type="response"
+    )
+  ),
+  Y_test
+)
+ROC.Relaxed.test = performance(predRelaxed_test, "sens", "fpr")
+AUC.Relaxed.test = round(performance(predRelaxed_test, "auc")@y.values[[1]], 4)
+lasso_log(sprintf("Relaxed Lasso test AUC = %.4f", AUC.Relaxed.test))
+
+df_lasso = data.frame(
+  FPR = c(
+    unlist(ROC.T.train@x.values),
+    unlist(ROC.T.test@x.values),
+    unlist(ROC.1.test@x.values),
+    unlist(ROC.2.test@x.values),
+    unlist(ROC.AIC.test@x.values),
+    unlist(ROC.R.test@x.values),
+    unlist(ROC.L.test@x.values),
+    unlist(ROC.Relaxed.test@x.values),
+    c(0, 0, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  TPR = c(
+    unlist(ROC.T.train@y.values),
+    unlist(ROC.T.test@y.values),
+    unlist(ROC.1.test@y.values),
+    unlist(ROC.2.test@y.values),
+    unlist(ROC.AIC.test@y.values),
+    unlist(ROC.R.test@y.values),
+    unlist(ROC.L.test@y.values),
+    unlist(ROC.Relaxed.test@y.values),
+    c(0, 1, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  type = factor(rep(1:10, c(
+    length(unlist(ROC.T.train@y.values)),
+    length(unlist(ROC.T.test@y.values)),
+    length(unlist(ROC.1.test@y.values)),
+    length(unlist(ROC.2.test@y.values)),
+    length(unlist(ROC.AIC.test@y.values)),
+    length(unlist(ROC.R.test@y.values)),
+    length(unlist(ROC.L.test@y.values)),
+    length(unlist(ROC.Relaxed.test@y.values)),
+    3,
+    length(unlist(ROC.T.test@x.values))
+  )))
+)
+
+ROC_plot_lasso = ggplot(df_lasso, aes(FPR, TPR, color=type, linetype=type)) +
+  geom_line() +
+  labs(title="ROC curves with Lasso and Relaxed Lasso",
+       x="False Positive Rate (1-Specificity)",
+       y="True Positive Rate (Sensitivity)") +
+  scale_color_manual(
+    name="",
+    values=1:10,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      paste("Lasso AUC =", AUC.L.test),
+      paste("Relaxed Lasso AUC =", AUC.Relaxed.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  ) +
+  scale_linetype_manual(
+    name="",
+    values=1:10,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      paste("Lasso AUC =", AUC.L.test),
+      paste("Relaxed Lasso AUC =", AUC.Relaxed.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  )
+
+ggsave("output/part2/lasso/roc_curves_with_lasso.png", ROC_plot_lasso, width=12, height=8)
+lasso_log("ROC figure saved in output/part2/lasso/roc_curves_with_lasso.png")
 
 #################
 # PART III
