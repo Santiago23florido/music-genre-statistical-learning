@@ -1,0 +1,64 @@
+\section{Multinomial Classification}
+
+The binary framework is now extended to the full five-genre problem. Each observation is modeled as a realization of a multinomial distribution with \(C = 5\) categories, and the softmax link function is used to relate the class probabilities to the linear predictors.
+
+\subsection{Exponential Family and Softmax Link}
+
+The multinomial distribution belongs to the exponential family with natural parameter
+\(\eta = \bigl(\log(\pi_1/\pi_C),\ldots,\log(\pi_{C-1}/\pi_C)\bigr)\),
+where \(\pi_c\) denotes the probability of class \(c\) and class \(C\) serves as the reference. Conditioning on a covariate vector \(x\) and defining the linear predictor \(\eta^{(c)}(x) = x\theta^{(c)}\) for \(c = 1,\ldots,C-1\), the class probabilities are recovered through the softmax function:
+\begin{equation}
+\pi_c(x) = \frac{\exp(x\theta^{(c)})}{1 + \sum_{j=1}^{C-1}\exp(x\theta^{(j)})},
+\quad c = 1,\ldots,C-1,
+\label{eq:softmax}
+\end{equation}
+\begin{equation}
+\pi_C(x) = \frac{1}{1 + \sum_{j=1}^{C-1}\exp(x\theta^{(j)})}.
+\label{eq:softmax_ref}
+\end{equation}
+
+\subsection{Log-Likelihood and Newton Estimation}
+
+For a sample of \(K\) independent observations, the log-likelihood is
+\begin{equation}
+\mathcal{L}(\theta) = \sum_{k=1}^{K}\sum_{c=1}^{C} y_{kc}\log\pi_c(x_k),
+\label{eq:multinomial_loglik}
+\end{equation}
+where \(y_{kc} = \mathbf{1}[Y_k = c]\). The gradient with respect to \(\theta_j^{(c)}\) is
+\begin{equation}
+\frac{\partial \mathcal{L}}{\partial \theta_j^{(c)}} = \sum_{k=1}^{K} x_{kj}\bigl(y_{kc} - \pi_{kc}\bigr),
+\label{eq:multinomial_gradient}
+\end{equation}
+and the Hessian block for components \((j,c)\) and \((l,d)\) is
+\begin{equation}
+\frac{\partial^2 \mathcal{L}}{\partial \theta_j^{(c)} \partial \theta_l^{(d)}} = -\sum_{k=1}^{K} x_{kj}x_{kl}\,\pi_{kc}\bigl(\mathbf{1}_{c=d} - \pi_{kd}\bigr).
+\label{eq:multinomial_hessian}
+\end{equation}
+Since the model belongs to the exponential family, the observed Hessian in Eq.~\eqref{eq:multinomial_hessian} coincides with the expected Fisher information matrix. Consequently, Newton's method and the IRLS algorithm (Fisher scoring) produce exactly the same sequence of iterates in this setting. The suggestion made by the generative tool examined in Appendix~A to replace Newton by IRLS for numerical stability is therefore misleading: the two methods are mathematically equivalent here, and the instability observed in practice is attributable to implementation details rather than to a conceptual difference between the algorithms.
+
+\subsection{Estimation with \texttt{multinom}}
+
+The multinomial logistic model is estimated using \texttt{nnet::multinom}, which internally maximizes the log-likelihood in Eq.~\eqref{eq:multinomial_loglik} through a quasi-Newton optimizer with a cross-entropy objective. The training and test sets used here include all five genres, derived from the same split defined in Section~II. The model is fitted on the training set and evaluated on the test set through the overall misclassification rate and the confusion matrix. The training and test error rates are reported in Table~\ref{tab:multinom_errors}.
+
+\begin{table}[!t]
+\centering
+\caption{Training and test error rates for the multinomial logistic model.}
+\label{tab:multinom_errors}
+\scriptsize
+\begin{tabular}{lc}
+\toprule
+Dataset & Error rate \\
+\midrule
+Training & 0.0681 \\
+Test     & 0.1022 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Neural Network Interpretation}
+
+The function \texttt{multinom} is implemented through a call to \texttt{nnet} with no hidden layer (\texttt{size = 0}), direct input-to-output connections (\texttt{skip = TRUE}), and softmax output activation. This architecture corresponds to a single-layer feedforward network with \(p\) input units and \(C\) output units connected by a softmax function, which is equivalent to the multinomial logistic model. Calling \texttt{nnet} directly with the same initialization (\texttt{rang} proportional to the data scale) and no weight decay (\texttt{decay = 0}) reproduces the predictions of \texttt{multinom} up to numerical precision, confirming the equivalence between the two parameterizations.
+
+\subsection{One-versus-Rest ROC Curves}
+
+In the multiclass setting, a single ROC curve is no longer well-defined, because the ROC framework requires a binary partition into positive and negative classes. With \(C = 5\) categories, no single positive/negative split is canonical. For this reason, five one-versus-rest ROC curves are constructed: for each genre \(g\), the predicted probability \(\hat{\pi}_g(x)\) is used as a score, and the remaining four genres are pooled into the negative class. The resulting curves are displayed in Appendix~\ref{app:skewness}, Fig.~\ref{fig:roc_ovr}. The per-class AUC values and their mean are reported as a summary of the overall multiclass discriminative performance.
