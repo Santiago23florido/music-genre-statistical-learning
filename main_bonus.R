@@ -1,0 +1,1185 @@
+##################
+# STA203 - Project
+##################
+library(ggplot2)
+library(FactoMineR)
+library(factoextra)
+library(cluster)
+library(MASS)
+library(ROCR)
+library(glmnet)
+library(nnet)
+library(e1071)
+
+rm(list=objects())
+graphics.off(); 
+seeds=read.table("data/Music_2026.txt", header=TRUE, sep=";")
+dir.create("output/part1", recursive=TRUE, showWarnings=FALSE)
+dir.create("output/part1/hclust_pca", recursive=TRUE, showWarnings=FALSE)
+#################
+# PART I
+#################
+
+####
+#Question 1
+####
+summary(seeds)        
+
+#Genre Proportion Graphic Representation          
+summary(as.factor(seeds$GENRE))
+gp = ggplot(seeds) +
+  aes(x=GENRE, fill=as.factor(GENRE)) +
+  geom_bar(aes(y=after_stat(count/sum(count)))) +
+  xlab("Music genre") +
+  ylab("Proportion of tracks") +
+  labs(fill="Music genre")
+ggsave("output/part1/genre_proportions.png", gp)
+prop.table(table(seeds$GENRE))
+
+n = nrow(seeds)
+p = ncol(seeds)
+
+#Log-transformation diagnostics on positive variables
+numeric_seeds = seeds[, sapply(seeds, is.numeric), drop=FALSE]
+positive_seeds = numeric_seeds[, vapply(numeric_seeds, function(x) all(x > 0), logical(1)), drop=FALSE]
+
+#Skewness calculation
+skewness_pop = function(x){
+  sx = sqrt(mean((x - mean(x))^2))
+  if (sx == 0) return(0)
+  mean((x - mean(x))^3)/(sx^3)
+}
+
+# Heteroscedasticity score based on the association between level and spread With LLM suggested implementation
+# Source for the association measure: NIST/SEMATECH rank correlation documentation
+# Source for the spread-versus-level diagnostic idea: NIST/SEMATECH spread-location plot
+heteroscedasticity_score = function(x, n_bins=10){
+  breaks = unique(quantile(x, probs=seq(0, 1, length.out=n_bins + 1), names=FALSE, type=8))
+  if (length(breaks) < 4) return(0)
+  groups = cut(x, breaks=breaks, include.lowest=TRUE, labels=FALSE)
+  mean_by_group = tapply(x, groups, mean)
+  sd_by_group = tapply(x, groups, sd)
+  valid = is.finite(mean_by_group) & is.finite(sd_by_group)
+  if (sum(valid) < 3) return(0)
+  score = suppressWarnings(cor(mean_by_group[valid], sd_by_group[valid], method="spearman"))
+  if (!is.finite(score)) return(0)
+  score
+}
+
+#Normality test on log transformed function
+shapiro_log_test = function(x, max_n=5000){
+  y = log(x)
+  if (length(y) > max_n){
+    y = y[seq_len(max_n)]
+  }
+  test = shapiro.test(y)
+  c(statistic=unname(test$statistic), p_value=test$p.value)
+}
+
+#Characteristic extraction for asymmetric identification
+log_candidates = data.frame(
+  variable = names(positive_seeds),
+  mean_value = vapply(positive_seeds, mean, numeric(1)),
+  median_value = vapply(positive_seeds, median, numeric(1)),
+  skewness = vapply(positive_seeds, skewness_pop, numeric(1)),
+  heteroscedasticity = vapply(positive_seeds, heteroscedasticity_score, numeric(1))
+)
+
+log_candidates$mean_median_ratio = log_candidates$mean_value / log_candidates$median_value
+
+top_n = min(30, nrow(log_candidates))
+
+top_ratio_variables = log_candidates$variable[order(log_candidates$mean_median_ratio, decreasing=TRUE)[1:top_n]]
+top_skewness_variables = log_candidates$variable[order(log_candidates$skewness, decreasing=TRUE)[1:top_n]]
+top_heteroscedasticity_variables = log_candidates$variable[order(log_candidates$heteroscedasticity, decreasing=TRUE)[1:top_n]]
+
+#Data preparation for ploting for asymmetric identification
+mean_median_plot_data = log_candidates[match(top_ratio_variables, log_candidates$variable), ]
+mean_median_plot_data = mean_median_plot_data[order(mean_median_plot_data$mean_median_ratio, decreasing=TRUE), ]
+skewness_plot_data = log_candidates[match(top_skewness_variables, log_candidates$variable), ]
+skewness_plot_data = skewness_plot_data[order(skewness_plot_data$skewness, decreasing=TRUE), ]
+heteroscedasticity_plot_data = log_candidates[match(top_heteroscedasticity_variables, log_candidates$variable), ]
+heteroscedasticity_plot_data = heteroscedasticity_plot_data[order(heteroscedasticity_plot_data$heteroscedasticity, decreasing=TRUE), ]
+
+
+#Ploting for asymmetric identification
+mean_median_plot = ggplot(mean_median_plot_data) +
+  aes(x=reorder(variable, mean_median_ratio), y=mean_median_ratio) +
+  geom_col(fill="steelblue") +
+  coord_flip() +
+  scale_y_log10() +
+  xlab("Positive variable") +
+  ylab("Mean / median ratio (log scale)")
+ggsave("output/part1/log_candidates_mean_median_ratio.png", mean_median_plot)
+
+
+skewness_plot = ggplot(skewness_plot_data) +
+  aes(x=reorder(variable, skewness), y=skewness) +
+  geom_col(fill="firebrick") +
+  coord_flip() +
+  scale_y_log10() +
+  xlab("Positive variable") +
+  ylab("Skewness coefficient (log scale)")
+ggsave("output/part1/log_candidates_skewness.png", skewness_plot)
+
+heteroscedasticity_plot = ggplot(heteroscedasticity_plot_data) +
+  aes(x=reorder(variable, heteroscedasticity), y=heteroscedasticity) +
+  geom_col(fill="purple4") +
+  coord_flip() +
+  xlab("Positive variable") +
+  ylab("Heteroscedasticity score")
+ggsave("output/part1/log_candidates_heteroscedasticity.png", heteroscedasticity_plot)
+
+
+#Candidates common to all the interest variables for asymmetric identification
+common_candidates = Reduce(intersect, list(top_ratio_variables, top_skewness_variables, top_heteroscedasticity_variables))
+common_candidates
+
+#Normality test on log transformed
+common_normality = t(vapply(positive_seeds[common_candidates], shapiro_log_test, numeric(2)))
+common_normality = data.frame(
+  variable = rownames(common_normality),
+  shapiro_w = common_normality[, "statistic"],
+  p_value = common_normality[, "p_value"],
+  row.names = NULL
+)
+
+common_normality = common_normality[order(common_normality$shapiro_w, decreasing=TRUE), ]
+common_normality
+
+#Normality test on log transformed Ploting
+common_normality_plot = ggplot(common_normality) +
+  aes(x=reorder(variable, shapiro_w), y=shapiro_w) +
+  geom_col(fill="darkgreen") +
+  coord_flip() +
+  xlab("Common candidate variable") +
+  ylab("Shapiro-Wilk statistic on log(x)")
+ggsave("output/part1/common_candidates_log_normality.png", common_normality_plot)
+
+# Shared preprocessing for the retained variables
+seeds_filtered = seeds
+seeds_filtered[, c("PAR_SC_V", "PAR_ASC_V")] = log(seeds_filtered[, c("PAR_SC_V", "PAR_ASC_V")])
+seeds_filtered = seeds_filtered[, -unique(which(abs(cor(seeds_filtered[,-p])) > 0.99 & upper.tri(cor(seeds_filtered[,-p])), arr.ind=TRUE)[,"col"])]
+seeds_filtered = seeds_filtered[, !names(seeds_filtered) %in% c("PAR_ASE_M", "PAR_ASE_MV", "PAR_SFM_M", "PAR_SFM_MV")]
+p_filtered = ncol(seeds_filtered)
+
+# PCA-specific scaling
+seeds_pca = seeds_filtered
+seeds_pca[,-p_filtered] = scale(seeds_pca[,-p_filtered], center=TRUE, scale=TRUE)
+p_pca = ncol(seeds_pca)
+
+
+####
+#Question 2
+####
+
+res = PCA(seeds_pca[,-p_pca],ncp=165, graph=FALSE)
+#Proper values study
+
+round(res$eig,4) # variance of each axe
+sum(res$eig[,1])
+
+#Inertie percetage of each component
+inertie_percentage = ggplot() + aes(x=1:length(res$eig[,2]), y=res$eig[,2]) + geom_col() + 
+  geom_hline(yintercept=100/p_pca, lty=2) +
+  ggtitle("Percentage of Inertia Explained by Each Principal Component") +
+  xlab("Principal component") +
+  ylab("Explained inertia (%)")
+ggsave("output/part1/inertie_percentage.png", inertie_percentage)
+
+
+#Correlation of variables study
+V = res$var
+#Quality of representation
+V$cos2
+
+#First principal plane
+#LLM suggestion for use of fviz_pca_ind to adequatly represent the genre in the  PCA graphs
+plt1 = factoextra::fviz_pca_ind(res, axes = c(1,2), habillage = seeds_pca[,p_pca], label = "none")
+plt2 = plot(res, axes = c(1,2), choix = "var")
+pca_first_plane = cowplot::plot_grid(plt1, plt2, ncol = 2, nrow = 1)
+ggsave("output/part1/pca_first_plane.png", pca_first_plane, width = 14, height = 6)
+
+#Second principal plane
+plt3 = factoextra::fviz_pca_ind(res, axes = c(3,4), habillage = seeds_pca[,p_pca], label = "none")
+plt4 = plot(res, axes = c(3,4), choix = "var")
+pca_second_plane = cowplot::plot_grid(plt3, plt4, ncol = 2, nrow = 1)
+ggsave("output/part1/pca_second_plane.png", pca_second_plane, width = 14, height = 6)
+
+#Inertias and quality for both planes
+planes_inertia = sum(res$eig[1:4,2])
+planes_cos2 = mean(rowSums(res$ind$cos2[,1:4]))
+
+c( planes_inertia = planes_inertia, planes_cos2 = planes_cos2)
+
+#which(res$eig[,2] > 100 / p)
+
+#Candidates to select a  4 6 10 34
+
+#Inertias and quality for Candidate variables
+for (k in c(4, 6, 10, 34)) {
+  cat(
+    "k =", k,
+    " | inertia =", sum(res$eig[1:k,2]),
+    " | mean cos2 =", mean(rowSums(res$ind$cos2[, 1:k, drop=FALSE])),
+    "\n"
+  )
+}
+
+# Variable representation on the first plane and first four axes
+var_cos2_12 = rowSums(res$var$cos2[, 1:2, drop=FALSE])
+var_cos2_14 = rowSums(res$var$cos2[, 1:4, drop=FALSE])
+
+# Top contributing variables for each of the first four PCs
+for (ax in 1:4) {
+  idx = order(res$var$contrib[, ax], decreasing=TRUE)[1:10]
+  
+  print(
+    data.frame(
+      PC = paste0("PC", ax),
+      variable = rownames(res$var$contrib)[idx],
+      contribution = round(res$var$contrib[idx, ax], 3),
+      correlation = round(res$var$coord[idx, ax], 3),
+      cos2_axis = round(res$var$cos2[idx, ax], 3),
+      cos2_plane12 = round(var_cos2_12[idx], 3),
+      cos2_first4 = round(var_cos2_14[idx], 3)
+    ),
+    row.names = FALSE
+  )
+}
+
+# Best represented variables on the first principal plane
+print(
+  data.frame(
+    variable = names(sort(var_cos2_12, decreasing=TRUE)[1:15]),
+    cos2_plane12 = round(sort(var_cos2_12, decreasing=TRUE)[1:15], 3)
+  ),
+  row.names = FALSE
+)
+
+# Best represented variables on the first four axes
+print(
+  data.frame(
+    variable = names(sort(var_cos2_14, decreasing=TRUE)[1:15]),
+    cos2_first4 = round(sort(var_cos2_14, decreasing=TRUE)[1:15], 3)
+  ),
+  row.names = FALSE
+)
+
+# Counts of well-represented variables
+print(
+  data.frame(
+    metric = c(
+      "Variables with cos2(1,2) >= 0.5",
+      "Variables with cos2(1,2) >= 0.7",
+      "Variables with cos2(1:4) >= 0.5",
+      "Variables with cos2(1:4) >= 0.7"
+    ),
+    value = c(
+      sum(var_cos2_12 >= 0.5),
+      sum(var_cos2_12 >= 0.7),
+      sum(var_cos2_14 >= 0.5),
+      sum(var_cos2_14 >= 0.7)
+    )
+  ),
+  row.names = FALSE
+)
+
+
+####
+#Question 3
+####
+
+genre = as.integer(as.factor(seeds_pca[,p_pca]))
+k_grp = nlevels(as.factor(seeds_pca[,p_pca]))
+
+#Hclust estimation for all ACP resultant candidates 4 6 10 34
+dir.create("output/part1/hclust_pca/not_normalized", recursive=TRUE, showWarnings=FALSE)
+dir.create("output/part1/hclust_pca/normalized", recursive=TRUE, showWarnings=FALSE)
+
+#Hclust estimation for all ACP resultant candidates 4 6 10 34
+#ggplot +ggsave  rendering to expensive LLM suggestion to implement png + plot suggested
+for (mode in c("not_normalized", "normalized")) {
+  for (d in c(4, 6, 10, 34, 165)) {
+    X_acp = res$ind$coord[, 1:d, drop=FALSE]
+    if (mode == "normalized") {
+      X_acp = scale(X_acp, center=TRUE, scale=TRUE)
+    }
+    dd = dist(X_acp)
+    
+    hc = hclust(dd, method="ward.D2")
+    
+    #Plot the first heights 
+    height_count = min(15, length(hc$height))
+    height_profile = rev(hc$height)[1:height_count]
+    
+    #Select k by maximizing the average silhouette width indice de silhouette based on (Rousseeuw et al. 1987) LLM suggested implementation of the function
+    k_candidates = 2:min(10, nrow(X_acp) - 1)
+    mean_silhouette_by_k = sapply(k_candidates, function(k){
+      grp_k = cutree(hc, k=k)
+      mean(silhouette(grp_k, dd)[,3])
+    })
+    k_selected = k_candidates[which.max(mean_silhouette_by_k)]
+    h_selected = rev(hc$height)[k_selected]
+    
+    grp = cutree(hc, k=k_selected)
+    
+    sil_ward = silhouette(grp, dd)
+    sil_genre = silhouette(genre, dd)
+    
+    ward_mean = mean(sil_ward[,3])
+    genre_mean = mean(sil_genre[,3])
+    
+    #Plot the first heights to support the choice of k
+    png(sprintf("output/part1/hclust_pca/%s/heights_pca_%02d_components.png", mode, d), width=1200, height=700, res=150)
+    barplot(height_profile, main=sprintf("Height diagram for Ward clustering on first %d PCs (%s)", d, mode))
+    abline(h=h_selected, lty=2, col="red")
+    dev.off()
+    
+    #Plot the mean silhouette criterion used to choose k
+    png(sprintf("output/part1/hclust_pca/%s/mean_silhouette_pca_%02d_components.png", mode, d), width=1200, height=700, res=150)
+    bar_mid = barplot(mean_silhouette_by_k, names.arg=k_candidates,
+                      main=sprintf("Average silhouette width by k on first %d PCs (%s)", d, mode),
+                      xlab="Number of clusters k", ylab="Average silhouette width")
+    abline(v=bar_mid[which.max(mean_silhouette_by_k)], lty=2, col="red")
+    dev.off()
+    
+    png(sprintf("output/part1/hclust_pca/%s/dendrogram_pca_%02d_components.png", mode, d), width=1200, height=700, res=150)
+    plot(hc, cex=0.5, main=sprintf("Ward dendrogram on first %d PCs (%s)", d, mode))
+    abline(h=h_selected, lty=2, col="red")
+    rect.hclust(hc, k=k_selected, border=2:(k_selected+1))
+    dev.off()
+    
+    #Build silhouettes for Ward clustering and true genre labels
+    plt_sil_ward = fviz_silhouette(sil_ward) +
+      ggtitle(sprintf("Ward silhouette on first %d PCs", d),
+              subtitle=sprintf("%s | selected k = %d | mean = %.3f", mode, k_selected, ward_mean))
+    plt_sil_genre = fviz_silhouette(sil_genre) +
+      ggtitle(sprintf("GENRE silhouette on first %d PCs", d),
+              subtitle=sprintf("%s | k = %d | mean = %.3f", mode, k_grp, genre_mean))
+    plt_sil = cowplot::plot_grid(plt_sil_ward, plt_sil_genre, ncol=2, nrow=1)
+    ggsave(sprintf("output/part1/hclust_pca/%s/silhouette_pca_%02d_components.png", mode, d), plt_sil, width=14, height=6)
+    
+    cat(
+      mode,
+      " | PCA dimensions =", d,
+      " | selected k =", k_selected,
+      " | mean Ward silhouette =", ward_mean,
+      " | mean GENRE silhouette =", genre_mean,
+      "\n"
+    )
+  }
+}
+
+####
+#Question 4
+####
+
+set.seed(103)
+train = sample(c(TRUE, FALSE), n, replace=TRUE, prob=c(2/3, 1/3))
+
+
+#################
+# PART II
+#################
+
+#Restrict to Classical and Jazz for binary classification
+binary_genres = c("Classical", "Jazz")
+binary_train = seeds_filtered[train & seeds_filtered[,p_filtered] %in% binary_genres, ]
+binary_test = seeds_filtered[!train & seeds_filtered[,p_filtered] %in% binary_genres, ]
+
+#Check the requested sample sizes
+c(nrow(binary_train), nrow(binary_test)) # ok
+
+####
+#Question 1
+####
+#Directory for output storage
+dir.create("output/part2/models", recursive=TRUE, showWarnings=FALSE)
+
+binary_train$Y = factor(binary_train$GENRE, levels=c("Classical", "Jazz"))
+binary_test$Y = factor(binary_test$GENRE, levels=c("Classical", "Jazz"))
+
+# Full logistic model with all retained variables
+train_ModT = binary_train[, !names(binary_train) %in% "GENRE"]
+test_ModT = binary_test[, !names(binary_test) %in% "GENRE"]
+
+ModT = glm(Y ~ ., family=binomial, data=train_ModT)
+summary(ModT)
+
+coef_ModT = summary(ModT)$coefficients
+
+# Significant variables in ModT
+vars_Mod1 = rownames(coef_ModT)[coef_ModT[,4] < 0.05]
+vars_Mod1 = vars_Mod1[vars_Mod1 != "(Intercept)"]
+
+vars_Mod2 = rownames(coef_ModT)[coef_ModT[,4] < 0.20]
+vars_Mod2 = vars_Mod2[vars_Mod2 != "(Intercept)"]
+
+# Reduced datasets for Mod1 and Mod2
+train_Mod1 = binary_train[, c("Y", vars_Mod1), drop=FALSE]
+test_Mod1 = binary_test[, c("Y", vars_Mod1), drop=FALSE]
+
+train_Mod2 = binary_train[, c("Y", vars_Mod2), drop=FALSE]
+test_Mod2 = binary_test[, c("Y", vars_Mod2), drop=FALSE]
+
+
+####
+#Question 2
+####
+#Directory for ROC graphs storage
+dir.create("output/part2/roc", recursive=TRUE, showWarnings=FALSE)
+
+#Load Pretrained models
+
+ModT = readRDS("output/part2/models/ModT.rds")
+Mod1 = readRDS("output/part2/models/Mod1.rds")
+Mod2 = readRDS("output/part2/models/Mod2.rds")
+ModAIC = readRDS("output/part2/models/ModAIC.rds")
+
+#Following training order 
+
+Y_train = as.numeric(binary_train$Y == "Jazz")
+Y_test = as.numeric(binary_test$Y == "Jazz")
+
+#Models predictions for test and train data
+predT_train = prediction(predict(ModT, newdata=train_ModT, type="response"), Y_train)
+predT_test = prediction(predict(ModT, newdata=test_ModT, type="response"), Y_test)
+pred1_test = prediction(predict(Mod1, newdata=test_Mod1, type="response"), Y_test)
+pred2_test = prediction(predict(Mod2, newdata=test_Mod2, type="response"), Y_test)
+predAIC_test = prediction(predict(ModAIC, newdata=test_ModT, type="response"), Y_test)
+pred_perfect = prediction(Y_test, Y_test)
+
+
+#Prepare ROC curves with sensitivity and false positive rate
+ROC.T.train = performance(predT_train, "sens", "fpr")
+ROC.T.test = performance(predT_test, "sens", "fpr")
+ROC.1.test = performance(pred1_test, "sens", "fpr")
+ROC.2.test = performance(pred2_test, "sens", "fpr")
+ROC.AIC.test = performance(predAIC_test, "sens", "fpr")
+ROC.perfect = performance(pred_perfect, "sens", "fpr")
+
+#Compute the area under the ROC curve for each model
+AUC.T.train = round(performance(predT_train, "auc")@y.values[[1]], 4)
+AUC.T.test = round(performance(predT_test, "auc")@y.values[[1]], 4)
+AUC.1.test = round(performance(pred1_test, "auc")@y.values[[1]], 4)
+AUC.2.test = round(performance(pred2_test, "auc")@y.values[[1]], 4)
+AUC.AIC.test = round(performance(predAIC_test, "auc")@y.values[[1]], 4)
+
+#Build a dataframe to superpose all ROC curves in a single ggplot
+df = data.frame(
+  FPR = c(
+    unlist(ROC.T.train@x.values),
+    unlist(ROC.T.test@x.values),
+    unlist(ROC.1.test@x.values),
+    unlist(ROC.2.test@x.values),
+    unlist(ROC.AIC.test@x.values),
+    c(0, 0, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  TPR = c(
+    unlist(ROC.T.train@y.values),
+    unlist(ROC.T.test@y.values),
+    unlist(ROC.1.test@y.values),
+    unlist(ROC.2.test@y.values),
+    unlist(ROC.AIC.test@y.values),
+    c(0, 1, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  type = factor(rep(1:7, c(
+    length(unlist(ROC.T.train@y.values)),
+    length(unlist(ROC.T.test@y.values)),
+    length(unlist(ROC.1.test@y.values)),
+    length(unlist(ROC.2.test@y.values)),
+    length(unlist(ROC.AIC.test@y.values)),
+    3,
+    length(unlist(ROC.T.test@x.values))
+  )))
+)
+
+#Plot the ROC curves with AUC values in the legend
+ROC_plot = ggplot(df, aes(FPR, TPR, color=type, linetype=type)) +
+  geom_line() +
+  labs(title="ROC curves",
+       x="False Positive Rate (1-Specificity)",
+       y="True Positive Rate (Sensitivity)") +
+  scale_color_manual(
+    name="",
+    values=1:7,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  ) +
+  scale_linetype_manual(
+    name="",
+    values=1:7,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  )
+
+ggsave("output/part2/roc/roc_curves.png", ROC_plot, width=12, height=8)
+
+#Save the model summaries for adequacy checks
+capture.output(summary(ModT), file="output/part2/roc/ModT_summary_for_adequacy.txt")
+capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.txt")
+capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
+capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
+
+# Adequacy of reduced logistic models relative to the full model
+adequacy_Mod1 = anova(Mod1, ModT, test = "Chisq")
+adequacy_Mod2 = anova(Mod2, ModT, test = "Chisq")
+adequacy_ModAIC = anova(ModAIC, ModT, test = "Chisq")
+
+capture.output(adequacy_Mod1, file = "output/part2/models/Mod1_adequacy.txt")
+capture.output(adequacy_Mod2, file = "output/part2/models/Mod2_adequacy.txt")
+capture.output(adequacy_ModAIC, file = "output/part2/models/ModAIC_adequacy.txt")
+
+####
+#Question 3
+####
+
+#Ridge regression is useful here because many audio predictors are correlated
+dir.create("output/part2/ridge", recursive=TRUE, showWarnings=FALSE)
+
+#Lambda grid for ridge regularization
+grid = 10^seq(10,-2,length=100)
+
+#Build the design matrix and the binary response
+x = as.matrix(train_ModT[, !names(train_ModT) %in% "Y"])
+y = as.numeric(train_ModT$Y == "Jazz")
+
+#Fit the ridge logistic model path
+ridge.fit = glmnet(x, y, alpha=0, lambda=grid, family="binomial")
+saveRDS(ridge.fit, "output/part2/ridge/ridge_fit.rds")
+
+#The intercept evolves from the empirical class proportion to the unpenalized logistic intercept
+coef(ridge.fit)[1,]
+
+#Keep only the coefficients without the intercept
+coef.ridge = coef(ridge.fit)[-1,]
+dim(coef.ridge)
+
+#Compare the two extreme lambda values
+ridge.extremes = cbind(
+  large_lambda = predict(ridge.fit, s=10^(10), type="coefficients")[1:(nrow(coef.ridge)+1),],
+  small_lambda = predict(ridge.fit, s=10^(-2), type="coefficients")[1:(nrow(coef.ridge)+1),]
+)
+capture.output(ridge.extremes, file="output/part2/ridge/ridge_extreme_coefficients.txt")
+
+#Plot the coefficient paths returned by glmnet
+png("output/part2/ridge/ridge_glmnet_plot.png", width=1200, height=900, res=150)
+par(mfrow=c(1,1))
+plot(ridge.fit)
+dev.off()
+
+#Plot the coefficient paths against -log(lambda)
+png("output/part2/ridge/ridge_coefficients_loglambda.png", width=1200, height=900, res=150)
+matplot(-log(grid), t(coef.ridge), type="l", xlab="-log(lambda)", ylab="coefficients")
+dev.off()
+
+####
+#Question 4
+####
+
+dir.create("output/part2/ridge_cv", recursive=TRUE, showWarnings=FALSE)
+
+x.test = as.matrix(test_ModT[, !names(test_ModT) %in% "Y"])
+y.test = as.numeric(test_ModT$Y == "Jazz")
+
+#Fit the ridge path on the training sample
+ridge.fit = glmnet(x, y, alpha=0, lambda=grid, family="binomial")
+
+#Cross-validation estimates the mean prediction error over 10 training folds
+set.seed(1)
+cv.out = cv.glmnet(x, y, alpha=0, nfolds=10, lambda=grid, family="binomial")
+
+#Plot the cross-validation curve
+png("output/part2/ridge_cv/ridge_cv_plot.png", width=1200, height=900, res=150)
+par(mfrow=c(1,1))
+plot(cv.out)
+dev.off()
+
+#Lambda minimizing the cross-validation error
+(bestlam = cv.out$lambda.min)
+log(bestlam)
+
+#Prediction performance on the test sample
+ridge.pred = predict(ridge.fit, s=bestlam, newx=x.test, type="response")
+ridge.performance = mean((ridge.pred - y.test)^2)
+ridge.performance
+
+#Re-estimate the ridge model on the whole training sample with the selected lambda
+ridge.fit.fin = glmnet(x, y, alpha=0, lambda=bestlam, family="binomial")
+
+#Save the fitted objects
+saveRDS(ridge.fit, "output/part2/ridge_cv/ridge_fit_path.rds")
+saveRDS(cv.out, "output/part2/ridge_cv/ridge_cv_out.rds")
+saveRDS(ridge.fit.fin, "output/part2/ridge_cv/ridge_fit_final.rds")
+
+#Save the selected lambda and the final coefficients
+capture.output(bestlam, file="output/part2/ridge_cv/ridge_best_lambda.txt")
+capture.output(ridge.performance, file="output/part2/ridge_cv/ridge_performance.txt")
+capture.output(predict(ridge.fit.fin, type="coefficients")[,1], file="output/part2/ridge_cv/ridge_final_coefficients.txt")
+
+####
+#Question 5
+####
+
+#Load Pretrained models
+
+ModRidge = readRDS("output/part2/ridge_cv/ridge_fit_final.rds")
+
+#Ridge predictions are added on the test sample to complete the ROC comparison
+predR_test = prediction(predict(ModRidge, newx=x.test, type="response"), Y_test)
+
+#Prepare ROC curves with sensitivity and false positive rate
+ROC.R.test = performance(predR_test, "sens", "fpr")
+
+#Compute the area under the ROC curve for each model
+AUC.R.test = round(performance(predR_test, "auc")@y.values[[1]], 4)
+
+#Build a dataframe to superpose all ROC curves in a single ggplot
+df = data.frame(
+  FPR = c(
+    unlist(ROC.T.train@x.values),
+    unlist(ROC.T.test@x.values),
+    unlist(ROC.1.test@x.values),
+    unlist(ROC.2.test@x.values),
+    unlist(ROC.AIC.test@x.values),
+    unlist(ROC.R.test@x.values),
+    c(0, 0, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  TPR = c(
+    unlist(ROC.T.train@y.values),
+    unlist(ROC.T.test@y.values),
+    unlist(ROC.1.test@y.values),
+    unlist(ROC.2.test@y.values),
+    unlist(ROC.AIC.test@y.values),
+    unlist(ROC.R.test@y.values),
+    c(0, 1, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  type = factor(rep(1:8, c(
+    length(unlist(ROC.T.train@y.values)),
+    length(unlist(ROC.T.test@y.values)),
+    length(unlist(ROC.1.test@y.values)),
+    length(unlist(ROC.2.test@y.values)),
+    length(unlist(ROC.AIC.test@y.values)),
+    length(unlist(ROC.R.test@y.values)),
+    3,
+    length(unlist(ROC.T.test@x.values))
+  )))
+)
+
+#Plot the ROC curves with AUC values in the legend
+ROC_plot = ggplot(df, aes(FPR, TPR, color=type, linetype=type)) +
+  geom_line() +
+  labs(title="ROC curves",
+       x="False Positive Rate (1-Specificity)",
+       y="True Positive Rate (Sensitivity)") +
+  scale_color_manual(
+    name="",
+    values=1:8,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  ) +
+  scale_linetype_manual(
+    name="",
+    values=1:8,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  )
+
+ggsave("output/part2/roc/roc_curves_with_ridge.png", ROC_plot, width=12, height=8)
+
+#Save the model summaries for adequacy checks
+capture.output(summary(ModT), file="output/part2/roc/ModT_summary_for_adequacy.txt")
+capture.output(summary(Mod1), file="output/part2/roc/Mod1_summary_for_adequacy.txt")
+capture.output(summary(Mod2), file="output/part2/roc/Mod2_summary_for_adequacy.txt")
+capture.output(summary(ModAIC), file="output/part2/roc/ModAIC_summary_for_adequacy.txt")
+capture.output(AUC.R.test, file="output/part2/roc/ModRidge_auc_test.txt")
+
+####
+#Question 6
+####
+
+dir.create("output/part2/summary", recursive=TRUE, showWarnings=FALSE)
+
+# Predictions on the test set for each model (probability of Jazz)
+threshold = 0.5
+pred_probs = list(
+  ModT   = predict(ModT,   newdata=test_ModT, type="response"),
+  Mod1   = predict(Mod1,   newdata=test_Mod1, type="response"),
+  Mod2   = predict(Mod2,   newdata=test_Mod2, type="response"),
+  ModAIC = predict(ModAIC, newdata=test_ModT, type="response"),
+  Ridge  = as.numeric(predict(ModRidge, newx=x.test, type="response"))
+)
+
+# Accuracy and error rate at threshold 0.5
+accuracy = sapply(pred_probs, function(pp) {
+  pred_class = ifelse(pp > threshold, 1, 0)
+  mean(pred_class == Y_test)
+})
+error_rate = 1 - accuracy
+
+# Number of variables per model
+n_vars = c(
+  ModT   = length(coef(ModT)) - 1,
+  Mod1   = length(coef(Mod1)) - 1,
+  Mod2   = length(coef(Mod2)) - 1,
+  ModAIC = length(coef(ModAIC)) - 1,
+  Ridge  = ncol(x)
+)
+
+# Summary table
+summary_table = data.frame(
+  Model          = names(pred_probs),
+  AUC_test       = c(AUC.T.test, AUC.1.test, AUC.2.test, AUC.AIC.test, AUC.R.test),
+  Accuracy_test  = round(accuracy, 4),
+  Error_rate_test = round(error_rate, 4),
+  Num_variables  = n_vars,
+  row.names      = NULL
+)
+print(summary_table)
+capture.output(print(summary_table), file="output/part2/summary/model_comparison.txt")
+
+# Bar plot comparing AUC across models
+summary_plot = ggplot(summary_table, aes(x=reorder(Model, -AUC_test), y=AUC_test)) +
+  geom_col(fill="steelblue") +
+  geom_text(aes(label=AUC_test), vjust=-0.3) +
+  ylim(0, 1) +
+  xlab("Model") + ylab("AUC (test)") +
+  ggtitle("Model Comparison: AUC on Test Set")
+ggsave("output/part2/summary/model_comparison_auc.png", summary_plot)
+
+# Confusion matrices for each model
+for (nm in names(pred_probs)) {
+  pred_class = ifelse(pred_probs[[nm]] > threshold, "Jazz", "Classical")
+  cm = table(Predicted=pred_class, Actual=binary_test$GENRE)
+  cat("\n--- Confusion matrix for", nm, "---\n")
+  print(cm)
+  capture.output(
+    {cat("Confusion matrix for", nm, "\n"); print(cm)},
+    file=sprintf("output/part2/summary/confusion_%s.txt", nm)
+  )
+}
+
+# Generalization performance estimate: the test AUC of the best model
+best_model_name = summary_table$Model[which.max(summary_table$AUC_test)]
+cat("\nRecommended model:", best_model_name, "\n")
+cat("Estimated generalization AUC:", max(summary_table$AUC_test), "\n")
+
+# Predict on external test data (Music_test_2026.txt)
+test_extern = read.table("data/Music_test_2026.txt", header=TRUE, sep=";")
+
+# Apply the same preprocessing as training data
+test_extern[, c("PAR_SC_V", "PAR_ASC_V")] = log(test_extern[, c("PAR_SC_V", "PAR_ASC_V")])
+
+# Predict with the best empirical model (ModAIC)
+pred_extern = predict(ModAIC, newdata=test_extern, type="response")
+pred_genres = ifelse(pred_extern > 0.5, "Jazz", "Classical")
+
+writeLines(pred_genres, "GustavoLoiola-SantiagoFlorido_test.txt")
+
+
+####
+#Question 6 - Bonus
+####
+
+dir.create("output/part2/lasso", recursive=TRUE, showWarnings=FALSE)
+
+# LLM suggestion for checking advance: report the main regularization milestones while comparing penalized models.
+lasso_log = function(step_text){
+  cat(sprintf("%s | Lasso bonus | %s\n", format(Sys.time(), "%H:%M:%S"), step_text))
+}
+
+# Use the same stratified folds across all penalized models for a fair comparison
+bonus_nfolds = 10
+set.seed(1)
+bonus_foldid = integer(length(y))
+for (cls in sort(unique(y))) {
+  idx = which(y == cls)
+  bonus_foldid[idx] = sample(rep(seq_len(bonus_nfolds), length.out=length(idx)))
+}
+
+# Reference code adapted from the official glmnet introduction vignette:
+# https://glmnet.stanford.edu/articles/glmnet.html
+lasso_log("Starting 10-fold cross-validation for Lasso.")
+set.seed(1)
+cv.lasso = cv.glmnet(
+  x,
+  y,
+  alpha=1,
+  family="binomial",
+  foldid=bonus_foldid,
+  type.measure="auc",
+  trace.it=1
+)
+
+bestlam.lasso = cv.lasso$lambda.min
+lasso_log(sprintf("Lasso lambda.min selected = %.6g", bestlam.lasso))
+
+ModLasso = glmnet(x, y, alpha=1, lambda=bestlam.lasso, family="binomial")
+lasso_log("Final Lasso fit completed.")
+
+saveRDS(ModLasso, "output/part2/lasso/lasso_fit_final.rds")
+lasso_log("Lasso model saved in output/part2/lasso/lasso_fit_final.rds")
+
+predL_test = prediction(as.numeric(predict(ModLasso, newx=x.test, type="response")), Y_test)
+ROC.L.test = performance(predL_test, "sens", "fpr")
+AUC.L.test = round(performance(predL_test, "auc")@y.values[[1]], 4)
+lasso_log(sprintf("Lasso test AUC = %.4f", AUC.L.test))
+
+# Reference code adapted from the official glmnet relaxed lasso vignette:
+# https://glmnet.stanford.edu/articles/relax.html
+lasso_log("Starting 10-fold cross-validation for Relaxed Lasso.")
+set.seed(1)
+cv.relaxed.lasso = cv.glmnet(
+  x,
+  y,
+  alpha=1,
+  family="binomial",
+  foldid=bonus_foldid,
+  type.measure="auc",
+  relax=TRUE,
+  trace.it=1
+)
+
+bestlam.relaxed = cv.relaxed.lasso$relaxed$lambda.min
+bestgamma.relaxed = cv.relaxed.lasso$relaxed$gamma.min
+lasso_log(sprintf("Relaxed Lasso lambda.min selected = %.6g", bestlam.relaxed))
+lasso_log(sprintf("Relaxed Lasso gamma.min selected = %.2f", bestgamma.relaxed))
+
+saveRDS(cv.relaxed.lasso, "output/part2/lasso/relaxed_lasso_cv_fit.rds")
+lasso_log("Relaxed Lasso CV model saved in output/part2/lasso/relaxed_lasso_cv_fit.rds")
+
+predRelaxed_test = prediction(
+  as.numeric(
+    predict(
+      cv.relaxed.lasso,
+      newx=x.test,
+      s="lambda.min",
+      gamma="gamma.min",
+      type="response"
+    )
+  ),
+  Y_test
+)
+ROC.Relaxed.test = performance(predRelaxed_test, "sens", "fpr")
+AUC.Relaxed.test = round(performance(predRelaxed_test, "auc")@y.values[[1]], 4)
+lasso_log(sprintf("Relaxed Lasso test AUC = %.4f", AUC.Relaxed.test))
+
+df_lasso = data.frame(
+  FPR = c(
+    unlist(ROC.T.train@x.values),
+    unlist(ROC.T.test@x.values),
+    unlist(ROC.1.test@x.values),
+    unlist(ROC.2.test@x.values),
+    unlist(ROC.AIC.test@x.values),
+    unlist(ROC.R.test@x.values),
+    unlist(ROC.L.test@x.values),
+    unlist(ROC.Relaxed.test@x.values),
+    c(0, 0, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  TPR = c(
+    unlist(ROC.T.train@y.values),
+    unlist(ROC.T.test@y.values),
+    unlist(ROC.1.test@y.values),
+    unlist(ROC.2.test@y.values),
+    unlist(ROC.AIC.test@y.values),
+    unlist(ROC.R.test@y.values),
+    unlist(ROC.L.test@y.values),
+    unlist(ROC.Relaxed.test@y.values),
+    c(0, 1, 1),
+    unlist(ROC.T.test@x.values)
+  ),
+  type = factor(rep(1:10, c(
+    length(unlist(ROC.T.train@y.values)),
+    length(unlist(ROC.T.test@y.values)),
+    length(unlist(ROC.1.test@y.values)),
+    length(unlist(ROC.2.test@y.values)),
+    length(unlist(ROC.AIC.test@y.values)),
+    length(unlist(ROC.R.test@y.values)),
+    length(unlist(ROC.L.test@y.values)),
+    length(unlist(ROC.Relaxed.test@y.values)),
+    3,
+    length(unlist(ROC.T.test@x.values))
+  )))
+)
+
+ROC_plot_lasso = ggplot(df_lasso, aes(FPR, TPR, color=type, linetype=type)) +
+  geom_line() +
+  labs(title="ROC curves with Lasso and Relaxed Lasso",
+       x="False Positive Rate (1-Specificity)",
+       y="True Positive Rate (Sensitivity)") +
+  scale_color_manual(
+    name="",
+    values=1:10,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      paste("Lasso AUC =", AUC.L.test),
+      paste("Relaxed Lasso AUC =", AUC.Relaxed.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  ) +
+  scale_linetype_manual(
+    name="",
+    values=1:10,
+    labels=c(
+      paste("ModT train AUC =", AUC.T.train),
+      paste("ModT test AUC =", AUC.T.test),
+      paste("Mod1 test AUC =", AUC.1.test),
+      paste("Mod2 test AUC =", AUC.2.test),
+      paste("ModAIC test AUC =", AUC.AIC.test),
+      paste("Ridge test AUC =", AUC.R.test),
+      paste("Lasso AUC =", AUC.L.test),
+      paste("Relaxed Lasso AUC =", AUC.Relaxed.test),
+      "Perfect rule AUC = 1.0000",
+      "Random rule AUC = 0.5000"
+    )
+  )
+
+ggsave("output/part2/lasso/roc_curves_with_lasso.png", ROC_plot_lasso, width=12, height=8)
+lasso_log("ROC figure saved in output/part2/lasso/roc_curves_with_lasso.png")
+
+
+#################
+# PART III
+#################
+
+dir.create("output/part3", recursive=TRUE, showWarnings=FALSE)
+
+# Use all 5 genres from the filtered dataset
+multi_train = seeds_filtered[train, ]
+multi_test  = seeds_filtered[!train, ]
+
+multi_train$GENRE = as.factor(multi_train$GENRE)
+multi_test$GENRE  = as.factor(multi_test$GENRE)
+
+c(nrow(multi_train), nrow(multi_test))
+table(multi_train$GENRE)
+table(multi_test$GENRE)
+
+####
+#Question 4 - Multinomial logistic regression with multinom
+####
+
+dir.create("output/part3/multinom", recursive=TRUE, showWarnings=FALSE)
+
+# Estimate the multinomial logistic model
+# multinom uses the last level as reference by default
+multi_fit = multinom(GENRE ~ ., data=multi_train, MaxNWts=10000, maxit=300)
+summary(multi_fit)
+
+capture.output(summary(multi_fit), file="output/part3/multinom/multinom_summary.txt")
+
+# Training error
+pred_train_multi = predict(multi_fit, newdata=multi_train)
+err_train_multi  = mean(pred_train_multi != multi_train$GENRE)
+
+# Test error
+pred_test_multi = predict(multi_fit, newdata=multi_test)
+err_test_multi  = mean(pred_test_multi != multi_test$GENRE)
+
+cat("Multinomial logistic regression:\n")
+cat("  Training error rate:", round(err_train_multi, 4), "\n")
+cat("  Test error rate:    ", round(err_test_multi, 4), "\n")
+
+# Confusion matrices
+cm_train_multi = table(Predicted=pred_train_multi, Actual=multi_train$GENRE)
+cm_test_multi  = table(Predicted=pred_test_multi,  Actual=multi_test$GENRE)
+
+cat("\n--- Training confusion matrix ---\n")
+print(cm_train_multi)
+cat("\n--- Test confusion matrix ---\n")
+print(cm_test_multi)
+
+capture.output(
+  {
+    cat("Training error:", err_train_multi, "\n")
+    cat("Test error:", err_test_multi, "\n\n")
+    cat("Training confusion matrix:\n"); print(cm_train_multi)
+    cat("\nTest confusion matrix:\n"); print(cm_test_multi)
+  },
+  file="output/part3/multinom/multinom_errors.txt"
+)
+
+####
+#Question 5 - Neural network equivalence with nnet
+####
+
+# The multinom function internally calls nnet with:
+#   size = 0       -> no hidden layer
+#   skip = TRUE    -> direct input-to-output connections
+#   softmax = TRUE -> softmax activation at the output
+#   entropy = TRUE -> cross-entropy loss function
+#   rang = 0       -> zero initialization (or small random)
+#
+# Architecture:
+#   Input layer:  p features (one node per predictor)
+#   Hidden layer: none (size = 0)
+#   Output layer: C-1 nodes (one per non-reference class), softmax
+#   The model computes: eta_c(x) = x * theta_c for c=1,...,C-1
+#   and pi_c(x) = exp(eta_c) / (1 + sum exp(eta_j))
+#
+# This is a single-layer network (no hidden units) equivalent to
+# multinomial logistic regression (softmax regression).
+
+dir.create("output/part3/nnet", recursive=TRUE, showWarnings=FALSE)
+
+# Prepare data for nnet: class indicator matrix for the response
+Y_train_ind = class.ind(multi_train$GENRE)
+X_train_mat = as.matrix(multi_train[, names(multi_train) != "GENRE"])
+
+Y_test_ind = class.ind(multi_test$GENRE)
+X_test_mat = as.matrix(multi_test[, names(multi_test) != "GENRE"])
+
+# Call nnet directly to reproduce multinom
+# multinom internally uses rang = 1/(max(abs(X))+1) and decay = 0
+set.seed(1)
+nn_fit = nnet(
+  x       = X_train_mat,
+  y       = Y_train_ind,
+  size    = 0,
+  skip    = TRUE,
+  softmax = TRUE,
+  entropy = TRUE,
+  rang    = 1 / (max(abs(X_train_mat)) + 1),  # match multinom's initialization
+  decay   = 0,
+  MaxNWts = 10000,
+  maxit   = 300
+)
+
+# Compare predictions with multinom
+pred_nn_train = predict(nn_fit, newdata=X_train_mat, type="class")
+pred_nn_test  = predict(nn_fit, newdata=X_test_mat,  type="class")
+
+err_nn_train = mean(pred_nn_train != multi_train$GENRE)
+err_nn_test  = mean(pred_nn_test  != multi_test$GENRE)
+
+cat("\nnnet direct call:\n")
+cat("  Training error rate:", round(err_nn_train, 4), "\n")
+cat("  Test error rate:    ", round(err_nn_test, 4), "\n")
+
+# Compare coefficients between multinom and nnet
+# With softmax=TRUE, nnet creates C output units (not C-1)
+# Total weights: C * (p + 1), arranged as (bias + p skip weights) per output
+C_classes = ncol(Y_train_ind)
+p_feat    = ncol(X_train_mat)
+coef_nnet = matrix(nn_fit$wts, nrow = p_feat + 1, ncol = C_classes)
+
+cat("\nPrediction agreement (multinom vs nnet):\n")
+cat("  Train:", mean(as.character(pred_train_multi) == pred_nn_train), "\n")
+cat("  Test: ", mean(as.character(pred_test_multi) == pred_nn_test), "\n")
+
+capture.output(
+  {
+    cat("nnet direct call results:\n")
+    cat("Training error:", err_nn_train, "\n")
+    cat("Test error:", err_nn_test, "\n")
+    cat("Prediction agreement with multinom (train):", mean(as.character(pred_train_multi) == pred_nn_train), "\n")
+    cat("Prediction agreement with multinom (test):", mean(as.character(pred_test_multi) == pred_nn_test), "\n")
+  },
+  file="output/part3/nnet/nnet_comparison.txt"
+)
+
+####
+#Question 6 - One-vs-rest ROC curves for 5 classes
+####
+
+# With C > 2 classes, a single ROC curve is insufficient because:
+# - ROC curves are defined for binary decisions (positive vs. negative)
+# - With C classes, there is no natural single positive/negative partition
+# - Each class needs its own "one vs. rest" binary evaluation
+# Therefore, we plot C separate ROC curves (one per class)
+
+dir.create("output/part3/roc", recursive=TRUE, showWarnings=FALSE)
+
+# Get predicted probabilities from multinom on the test set
+probs_test = predict(multi_fit, newdata=multi_test, type="prob")
+genres = levels(multi_test$GENRE)
+
+# Build all one-vs-rest ROC data
+roc_list = list()
+auc_list = c()
+
+for (g in genres) {
+  y_binary = as.numeric(multi_test$GENRE == g)
+  pred_obj = prediction(probs_test[, g], y_binary)
+  roc_perf = performance(pred_obj, "tpr", "fpr")
+  auc_val  = round(performance(pred_obj, "auc")@y.values[[1]], 4)
+
+  roc_list[[g]] = data.frame(
+    FPR   = unlist(roc_perf@x.values),
+    TPR   = unlist(roc_perf@y.values),
+    Genre = paste0(g, " (AUC = ", auc_val, ")")
+  )
+  auc_list[g] = auc_val
+}
+
+roc_df = do.call(rbind, roc_list)
+
+# Plot all 5 ROC curves on a single figure
+roc_multi_plot = ggplot(roc_df, aes(x=FPR, y=TPR, color=Genre)) +
+  geom_line(linewidth=0.8) +
+  geom_abline(slope=1, intercept=0, linetype="dashed", color="grey50") +
+  labs(
+    title = "One-vs-Rest ROC Curves (Multinomial Logistic Regression)",
+    x     = "False Positive Rate (1 - Specificity)",
+    y     = "True Positive Rate (Sensitivity)",
+    color = "Genre"
+  ) +
+  theme_minimal()
+
+ggsave("output/part3/roc/roc_one_vs_rest.png", roc_multi_plot, width=10, height=7)
+
+# Save AUC values
+capture.output(
+  {
+    cat("One-vs-Rest AUC values:\n")
+    for (g in genres) cat(" ", g, ":", auc_list[g], "\n")
+    cat("\nMean AUC:", round(mean(auc_list), 4), "\n")
+  },
+  file="output/part3/roc/auc_one_vs_rest.txt"
+)
+
+cat("\nOne-vs-Rest AUC values:\n")
+print(auc_list)
+cat("Mean AUC:", round(mean(auc_list), 4), "\n")
